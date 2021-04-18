@@ -221,7 +221,7 @@ int main(int argc, char **argv)
 		npo[i].width = 48;
 		npo[i].posy = 192;
 		npo[i].posx = pos;
-		pos -+ 256;
+		pos -= 256;
 		npo[i].speed = -4;
 	}
 	
