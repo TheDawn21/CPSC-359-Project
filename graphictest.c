@@ -25,6 +25,8 @@ typedef struct player
 typedef struct car
 {
 	int posx, posy;
+	int width;
+	int speed;
 } Car;
 
 void drawPixel(Pixel *pixel){
@@ -72,12 +74,13 @@ void drawPlayer(Player *play, Pixel *pix, Pixel *screen)
 void movecar(Pixel *pix, Pixel *screen, Car *carpoi)
 {
 	int x = carpoi->posx;
-	x += 4;
-	if (x > 1000) x = -32; //If a car goes beyond the right bound, it will respond right before the left bound.
+	x += carpoi->speed;
+	if (x > 1000 && carpoi->speed > 0) x = -(carpoi->width); //If the car is moving from left to right and moves beyond the right bound, respawn it on the left side
+	if (x < -(carpoi->width) && carpoi->speed < 0) x = 1000 + carpoi->width; //If the car is moving from right to left and moves beyond the left bound, respawn it on the right side.
 	carpoi->posx = x;
 	int y = carpoi->posy;
 	int index;
-	int xend = x + 31;
+	int xend = x + (carpoi->width - 1);
 	int yend = y + 31;
 	for (y; y < yend; y++)
 	{
@@ -93,18 +96,42 @@ void movecar(Pixel *pix, Pixel *screen, Car *carpoi)
 			}
 		}
 	}	
-}	
+}
 
-void refreshscreen(Player *play, Pixel *pix, Pixel *screen, Car *carpoi)
+int checkcollision(Player *play, Car *carpoi, int carnum)
+{
+	for (int i = 0; i < carnum; i++)
+	{
+		if (play->posy > ((carpoi + i)->posy - 32) && play->posy < ((carpoi + i)->posy + 31))	//If the player is in this range, then it's possible they'll get hit by a car
+		{
+			if ((carpoi + i)->speed < 0 && (play->posx + 31) > (carpoi + i)->posx && play->posx < (carpoi + i)->posx + ((carpoi + i)->width - 1))
+			{
+				//That logical statement is a bit complicated, but basically it means that if the car is moving left, and the player is within a certain range of it, they'll get hit
+				play->posx = 0;
+				play->posy = 0; //For now, if the player gets hit, all we'll do is move them to the corner.
+				return 1;
+			}
+			if ((carpoi + i)->speed > 0 && play->posx > (carpoi + i)->posx && (play->posx) < ((carpoi + i)->posx + ((carpoi + i)->width - 1)))
+			{
+				play->posx = 0;
+				play->posy = 0;
+				return 1;
+			}
+		}
+	}
+	return 0;
+}
+
+int refreshscreen(Player *play, Pixel *pix, Pixel *screen, Car *carpoi, int carnum)
 {
 		drawBack(pix, screen);
 		drawPlayer(play, pix, screen);
-		movecar(pix, screen, carpoi);
-		for (int i = 0; i < 704000; i++)
-		drawPixel((screen + i));
+		for (int i = 0; i < carnum; i++) movecar(pix, screen, (carpoi + i));
+		for (int i = 0; i < 704000; i++) drawPixel((screen + i));
+		return checkcollision(play, carpoi, carnum);
 }
 
-void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen, Car *carpoi) 
+void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen, Car *carpoi, int carnum) 
 {
 	int x = play->posx;
 	int y = play->posy;
@@ -117,7 +144,7 @@ void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen
 			{
 				y -= 2;
 				play->posy = y;
-				refreshscreen(play, pix, screen, carpoi);
+				if (refreshscreen(play, pix, screen, carpoi, carnum) == 1) break;
 				Wait(20833); //41666 microseconds is approximate to 1/24th of a second
 			}
 		}
@@ -130,7 +157,7 @@ void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen
 			{
 				y += 2;
 				play->posy = y;
-				refreshscreen(play, pix, screen, carpoi);
+				if (refreshscreen(play, pix, screen, carpoi, carnum) == 1) break;
 				Wait(20833);
 			}
 		}
@@ -143,7 +170,7 @@ void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen
 			{
 				x -= 2;
 				play->posx = x;
-				refreshscreen(play, pix, screen, carpoi);
+				if (refreshscreen(play, pix, screen, carpoi, carnum) == 1) break;
 				Wait(20833);
 			}	
 		}
@@ -156,7 +183,7 @@ void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen
 			{
 				x += 2;
 				play->posx = x;
-				refreshscreen(play, pix, screen, carpoi);
+				if (refreshscreen(play, pix, screen, carpoi, carnum) == 1) break;
 				Wait(20833);
 			}	
 		}
@@ -177,25 +204,41 @@ int main(int argc, char **argv)
 	Pixel *screen;
 	screen = (Pixel *)malloc(704000 * sizeof(Pixel)); //This will create an array of pixels
 	Car *npo;
-	npo = malloc(sizeof(Car));
+	npo = (Car *)malloc(8 * sizeof(Car));
+	int pos = 0;
+	int i;
+	for (i = 0; i < 4; i++)
+	{
+		npo[i].width = 48;		//128
+		npo[i].posy = 128;		// 64
+		npo[i].posx = pos;		//192
+		pos += 256;
+		npo[i].speed = 4;
+	}
+	pos = 1000;
+	for (i = 4; i < 8; i++)
+	{
+		npo[i].width = 48;
+		npo[i].posy = 192;
+		npo[i].posx = pos;
+		pos -+ 256;
+		npo[i].speed = -4;
+	}
 	
 	play->posy = 32;
 	play->posx = 32;
 	
-	npo->posx = 0;
-	npo->posy = 128;
-	
 	unsigned short button = NOBUTT;
 	Dir direct;
 	
-	refreshscreen(play, pix, screen, npo);
+	refreshscreen(play, pix, screen, npo, 8);
 	
 	int looptrue = 1;
 	while (looptrue)
 	{
 		button = Read_SNES(gpio);
-		moveplayer(play, pix, button, screen, npo);
-		refreshscreen(play, pix, screen, npo);
+		moveplayer(play, pix, button, screen, npo, 8);
+		refreshscreen(play, pix, screen, npo, 8);
 		Wait(20833);
 		if ((button & START_B) == 0) looptrue = 0;
 	}
