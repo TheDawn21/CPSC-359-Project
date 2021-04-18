@@ -28,8 +28,9 @@ void drawPixel(Pixel *pixel){
 	*((unsigned short int*)(framebufferstruct.fptr + location)) = pixel->color;
 }
 
-void drawBack(Pixel *pix)
+void drawBack(Pixel *pix, Pixel *screen)
 {
+	int index;
 	//This method will draw a red rectangle that's 1000 pixels wide and 700 pixels tall.
 	for (int y = 0; y < 704; y++)
 	{
@@ -38,15 +39,17 @@ void drawBack(Pixel *pix)
 			pix->color = 0xF800;
 			pix->x = x;
 			pix->y = y;
-			drawPixel(pix);
+			index = (y * 1000) + x;
+			screen[index] = *pix;
 		}
 	}	
 }
 
-void drawPlayer(Player *play, Pixel *pix)
+void drawPlayer(Player *play, Pixel *pix, Pixel *screen)
 {
 	int x = play->posx;
 	int y = play->posy;
+	int index;
 	int xend = x + 31;
 	int yend = y + 31;
 	for (y; y < yend; y++)
@@ -56,18 +59,21 @@ void drawPlayer(Player *play, Pixel *pix)
 			pix->color = 0xF00; //Hopefully this will be green
 			pix->x = x;
 			pix->y = y;
-			drawPixel(pix);
+			index = (y * 1000) + x;
+			screen[index] = *pix; //Places the player pixel into the "screen" array of pixels
 		}
 	}
 }
 
-void refreshscreen(Player *play, Pixel *pix)
+void refreshscreen(Player *play, Pixel *pix, Pixel *screen)
 {
-		drawBack(pix);
-		drawPlayer(play, pix);
+		drawBack(pix, screen);
+		drawPlayer(play, pix, screen);
+		for (int i = 0; i < 704000; i++)
+		drawPixel((screen + i));
 }
 
-void moveplayer(Player *play, Pixel *pix, unsigned short bitfield)
+void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen)
 {
 	int x = play->posx;
 	int y = play->posy;
@@ -80,7 +86,7 @@ void moveplayer(Player *play, Pixel *pix, unsigned short bitfield)
 			{
 				y -= 2;
 				play->posy = y;
-				refreshscreen(play, pix);
+				refreshscreen(play, pix, screen);
 				Wait(20833); //41666 microseconds is approximate to 1/24th of a second
 			}
 		}
@@ -93,7 +99,7 @@ void moveplayer(Player *play, Pixel *pix, unsigned short bitfield)
 			{
 				y += 2;
 				play->posy = y;
-				refreshscreen(play, pix);
+				refreshscreen(play, pix, screen);
 				Wait(20833);
 			}
 		}
@@ -106,7 +112,7 @@ void moveplayer(Player *play, Pixel *pix, unsigned short bitfield)
 			{
 				x -= 2;
 				play->posx = x;
-				refreshscreen(play, pix);
+				refreshscreen(play, pix, screen);
 				Wait(20833);
 			}	
 		}
@@ -119,7 +125,7 @@ void moveplayer(Player *play, Pixel *pix, unsigned short bitfield)
 			{
 				x += 2;
 				play->posx = x;
-				refreshscreen(play, pix);
+				refreshscreen(play, pix, screen);
 				Wait(20833);
 			}	
 		}
@@ -137,6 +143,8 @@ int main(int argc, char **argv)
 	pix = malloc(sizeof(Pixel));
 	Player *play;
 	play = malloc(sizeof(Player));
+	Pixel *screen;
+	screen = (Pixel *)malloc(704000 * sizeof(Pixel)); //This will create an array of pixels
 	
 	play->posy = 32;
 	play->posx = 32;
@@ -144,19 +152,20 @@ int main(int argc, char **argv)
 	unsigned short button = NOBUTT;
 	Dir direct;
 	
-	refreshscreen(play, pix);
+	refreshscreen(play, pix, screen);
 	
 	int looptrue = 1;
 	while (looptrue)
 	{
 		while (button == NOBUTT) button = Read_SNES(gpio);
-		moveplayer(play, pix, button);
+		moveplayer(play, pix, button, screen);
 		if ((button & START_B) == 0) looptrue = 0;
 		button = NOBUTT;
 	}
 	
 	free(pix);
 	free(play);
+	free(screen);
 	
 	return 0;
 }
