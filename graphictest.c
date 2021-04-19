@@ -10,7 +10,6 @@
 //We'll move a small 32 x 32 pixel box within a larger box. So, if one of the D-Pad buttons is pressed on the controller, the box'll move 32 pixels in that direction.
 //Let's say the box moves 2 pixels per frame, so it would take 16 frames to make a move. 
 
-typedef enum dir {UP, DOWN, LEFT, RIGHT, NONE} Dir; //We'll use the "dir" enumeration to specify which direction to move in.
 struct fbs framebufferstruct;
 
 typedef struct {
@@ -22,12 +21,20 @@ typedef struct player
 {
 	int posx, posy; //The x and y position of the top left pixel
 } Player;
+
 typedef struct car
 {
 	int posx, posy;
 	int width;
 	int speed;
 } Car;
+
+typedef struct log
+{
+	int posx, posy;
+	int width;
+	int speed;
+} Log;
 
 void drawPixel(Pixel *pixel){
 	long int location = (pixel->x +framebufferstruct.xOff) * (framebufferstruct.bits/8) + (pixel->y+framebufferstruct.yOff) * framebufferstruct.lineLength;
@@ -37,8 +44,7 @@ void drawPixel(Pixel *pixel){
 void drawBack(Pixel *pix, Pixel *screen)
 {
 	int index;
-	//This method will draw a red rectangle that's 1000 pixels wide and 700 pixels tall.
-	for (int y = 0; y < 704; y++)
+	for (int y = 0; y < 32; y++) //First loop will draw a red strip at the top of the screen
 	{
 		for (int x = 0; x < 1000; x++)
 		{
@@ -48,7 +54,29 @@ void drawBack(Pixel *pix, Pixel *screen)
 			index = (y * 1000) + x;
 			screen[index] = *pix;
 		}
-	}	
+	}
+	for (int y = 32; y < 160; y++) //Second loop draws a blue strip (the river)
+	{
+		for (int x = 0; x < 1000; x++)
+		{
+			pix->color = 0xFF;
+			pix->x = x;
+			pix->y = y;
+			index = (y * 1000) + x;
+			screen[index] = *pix;
+		}
+	}
+	for (int y = 160; y < 704; y++)
+	{
+		for (int x = 0; x < 1000; x++)
+		{
+			pix->color = 0xF800;
+			pix->x = x;
+			pix->y = y;
+			index = (y * 1000) + x;
+			screen[index] = *pix;
+		}
+	}
 }
 
 void drawPlayer(Player *play, Pixel *pix, Pixel *screen)
@@ -122,16 +150,72 @@ int checkcollision(Player *play, Car *carpoi, int carnum)
 	return 0;
 }
 
-int refreshscreen(Player *play, Pixel *pix, Pixel *screen, Car *carpoi, int carnum)
+int checkwater(Player *play, int watstart, int watend)
 {
-		drawBack(pix, screen);
-		drawPlayer(play, pix, screen);
-		for (int i = 0; i < carnum; i++) movecar(pix, screen, (carpoi + i));
-		for (int i = 0; i < 704000; i++) drawPixel((screen + i));
-		return checkcollision(play, carpoi, carnum);
+	//This method will check if the player falls in the water. watstart is the y coordinate where the water starts, watend is where it ends.
+	//This method simply checks if the player is in the range. If they are, then the refreshscreen method will check if they're sitting on a log.
+	if (play->posy >= watstart && play->posy <= watend) { return 1; }
+	else { return 0; }
+	//That's a pretty simple one!
 }
 
-void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen, Car *carpoi, int carnum) 
+int checklog(Player *play, Log *logpoi, int lognum)
+{
+	//This method will check if the player is sitting on a log. logpoi is the base address for an array of log structures. lognum is the number of logs in the array.
+	for (int i = 0; i < lognum; i++)
+	{
+		if (play->posy == (logpoi + i)->posy) //Check if the player is within a certain vertical range from the log
+		{
+			if ((play->posx + 31) > (logpoi + i)->posx && play->posx < ((logpoi + i)->posx + ((logpoi + i)->width - 1)))
+			{
+				//The above if statement checks if the player is within a certain horizontal range of the log
+				play->posx += (logpoi + i)->speed; //Moves the player along with the log
+				return 1;
+			}
+		}
+	}
+	play->posx = 0; //If the player isn't on a log, return them to the top-left corner
+	play->posy = 0;
+	return 0;
+}
+
+void movelog(Pixel *pix, Pixel *screen, Log *logpoi)
+{
+	logpoi->posx += logpoi->speed;
+	if (logpoi->posx > 1000 && logpoi->speed > 0) logpoi->posx = -(logpoi->width);
+	if (logpoi->posx < -(logpoi->width) && logpoi->speed < 0) logpoi->posx = 1000 + logpoi->width;
+	int x = logpoi->posx;
+	int y = logpoi->posy;
+	int index;
+	int xend = x + (logpoi->width - 1);
+	int yend = y + 31;
+	for (y; y < yend; y++)
+	{
+		for (x = logpoi->posx; x < xend; x++)
+		{
+			if (x >= 0 && x <= 1000)
+			{
+				pix->color = 0x964B00; //This should be brown;
+				pix->x = x;
+				pix->y = y;
+				index = (y * 1000) + x;
+				screen[index] = *pix;
+			}
+		}
+	}
+}
+
+int refreshscreen(Player *play, Pixel *pix, Pixel *screen, Car *carpoi, int carnum, Log *logpoi, int lognum)
+{
+	drawBack(pix, screen);
+	for (int i = 0; i < lognum; i++) movelog(pix, screen, (logpoi + i));
+	drawPlayer(play, pix, screen);
+	for (int i = 0; i < carnum; i++) movecar(pix, screen, (carpoi + i));
+	for (int i = 0; i < 704000; i++) drawPixel((screen + i));
+	if (checkcollision(play, carpoi, carnum) == 1) return 1; //We need to return some value if the player's hit by a car to interrupt the moveplayer method
+}
+
+void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen, Car *carpoi, int carnum, Log *logpoi, int lognum) 
 {
 	int x = play->posx;
 	int y = play->posy;
@@ -144,8 +228,8 @@ void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen
 			{
 				y -= 2;
 				play->posy = y;
-				if (refreshscreen(play, pix, screen, carpoi, carnum) == 1) break;
-				Wait(20833); //41666 microseconds is approximate to 1/24th of a second
+				if (refreshscreen(play, pix, screen, carpoi, carnum, logpoi, lognum) == 1) break;
+				Wait(20833);
 			}
 		}
 	}
@@ -157,7 +241,7 @@ void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen
 			{
 				y += 2;
 				play->posy = y;
-				if (refreshscreen(play, pix, screen, carpoi, carnum) == 1) break;
+				if (refreshscreen(play, pix, screen, carpoi, carnum, logpoi, lognum) == 1) break;
 				Wait(20833);
 			}
 		}
@@ -170,7 +254,7 @@ void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen
 			{
 				x -= 2;
 				play->posx = x;
-				if (refreshscreen(play, pix, screen, carpoi, carnum) == 1) break;
+				if (refreshscreen(play, pix, screen, carpoi, carnum, logpoi, lognum) == 1) break;
 				Wait(20833);
 			}	
 		}
@@ -183,7 +267,7 @@ void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen
 			{
 				x += 2;
 				play->posx = x;
-				if (refreshscreen(play, pix, screen, carpoi, carnum) == 1) break;
+				if (refreshscreen(play, pix, screen, carpoi, carnum, logpoi, lognum) == 1) break;
 				Wait(20833);
 			}	
 		}
@@ -205,12 +289,14 @@ int main(int argc, char **argv)
 	screen = (Pixel *)malloc(704000 * sizeof(Pixel)); //This will create an array of pixels
 	Car *npo;
 	npo = (Car *)malloc(8 * sizeof(Car));
+	Log *logarr; 
+	logarr = (Log *)malloc(16 * sizeof(Log));
 	int pos = 0;
 	int i;
 	for (i = 0; i < 4; i++)
 	{
 		npo[i].width = 48;		//128
-		npo[i].posy = 128;		// 64
+		npo[i].posy = 192;		// 64
 		npo[i].posx = pos;		//192
 		pos += 256;
 		npo[i].speed = 4;
@@ -219,26 +305,62 @@ int main(int argc, char **argv)
 	for (i = 4; i < 8; i++)
 	{
 		npo[i].width = 48;
-		npo[i].posy = 192;
+		npo[i].posy = 224;
 		npo[i].posx = pos;
 		pos -= 256;
 		npo[i].speed = -4;
+	}
+	pos = 0;
+	for (i = 0; i < 4; i++)
+	{
+		logarr[i].width = 48;
+		logarr[i].posy = 32;
+		logarr[i].posx = pos;
+		pos += 256;
+		logarr[i].speed = 4;
+	}
+	pos = 1000;
+	for (i = 4; i < 8; i++)
+	{
+		logarr[i].width = 48;
+		logarr[i].posy = 64;
+		logarr[i].posx = pos;
+		pos -= 256;
+		logarr[i].speed = -4;
+	}
+	pos = 0;
+	for (i = 8; i < 12; i++)
+	{
+		logarr[i].width = 48;
+		logarr[i].posy = 96;
+		logarr[i].posx = pos;
+		pos += 256;
+		logarr[i].speed = 4;
+	}
+	pos = 1000;
+	for (i = 12; i < 16; i++)
+	{
+		logarr[i].width = 48;
+		logarr[i].posy = 128;
+		logarr[i].posx = pos;
+		pos -= 256;
+		logarr[i].speed = -4;
 	}
 	
 	play->posy = 32;
 	play->posx = 32;
 	
 	unsigned short button = NOBUTT;
-	Dir direct;
 	
-	refreshscreen(play, pix, screen, npo, 8);
+	refreshscreen(play, pix, screen, npo, 8, logarr, 16);
 	
 	int looptrue = 1;
 	while (looptrue)
 	{
 		button = Read_SNES(gpio);
-		moveplayer(play, pix, button, screen, npo, 8);
-		refreshscreen(play, pix, screen, npo, 8);
+		moveplayer(play, pix, button, screen, npo, 8, logarr, 16);
+		if (checkwater(play, 32, 159) == 1) checklog(play, logarr, 16); //We don't want to check if the player's on a log until they have completeted a "leap"
+		refreshscreen(play, pix, screen, npo, 8, logarr, 16);
 		Wait(20833);
 		if ((button & START_B) == 0) looptrue = 0;
 	}
@@ -247,6 +369,7 @@ int main(int argc, char **argv)
 	free(play);
 	free(screen);
 	free(npo);
+	free(logarr);
 	
 	return 0;
 }
