@@ -5,8 +5,7 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include "frog.h"
-#include "mainMenu.h"
+#include "numgraphics.h"
 
 //What we want to do with this program is read for input from the SNES controller in one thread, and refresh the screen at a rate of 24 frames per second.
 //We'll move a small 32 x 32 pixel box within a larger box. So, if one of the D-Pad buttons is pressed on the controller, the box'll move 32 pixels in that direction.
@@ -14,10 +13,27 @@
 
 struct fbs framebufferstruct;
 
+typedef struct game
+{
+	int life;
+	int time;
+	int score;
+	int level;
+} Game;
+
+void initgame(Game *gamepoi)
+{
+	gamepoi->life = 4;
+	gamepoi->time = 90;
+	gamepoi->score = 0;
+	gamepoi->level = 1;
+}
+
 typedef struct {
-	int color;
+	short color;
 	int x, y;
 } Pixel;
+
 
 typedef struct player
 {
@@ -79,6 +95,79 @@ void drawBack(Pixel *pix, Pixel *screen)
 			screen[index] = *pix;
 		}
 	}
+}
+
+void drawdigit(int digit, Pixel *pix, Pixel *screen, int xco, int yco)
+{
+	int indexa, indexb;
+	indexa = 0;
+	short * digpoi = NULL; //Each image struct contains an array of characters that represents the colors of various pixels. We can cast that array as shorts and point digpoi at its base address
+	if (digit >= 0 || digit <= 9) //Check that digit is in the range [0, 9]
+	{
+		if (digit == 0) digpoi = (short *)digit0.pixel_data;
+		else if (digit == 1) digpoi = (short *)digit1.pixel_data;
+		else if (digit == 2) digpoi = (short *)digit2.pixel_data;
+		else if (digit == 3) digpoi = (short *)digit3.pixel_data;
+		else if (digit == 4) digpoi = (short *)digit4.pixel_data;
+		else if (digit == 5) digpoi = (short *)digit5.pixel_data;
+		else if (digit == 6) digpoi = (short *)digit6.pixel_data;
+		else if (digit == 7) digpoi = (short *)digit7.pixel_data;
+		else if (digit == 8) digpoi = (short *)digit8.pixel_data;
+		else if (digit == 9) digpoi = (short *)digit9.pixel_data;
+		
+		if (digpoi != NULL)
+		{
+			for (int y = yco; y < (yco + 16); y++)
+			{
+				for (int x = xco; x < (xco + 16); x++)
+				{
+					pix->color = digpoi[indexa];
+					indexa++;
+					pix->x = x;
+					pix->y = y;
+					indexb = (y * 1000) + x;
+					screen[indexb] = *pix;
+				}
+			}
+		}
+	}
+}
+
+void drawscore(int score, Pixel *pix, Pixel *screen, int xco, int yco)
+{
+	int dig;
+	int x = xco;
+	int tempscore = score;
+	dig = tempscore / 10000000;
+	drawdigit(dig, pix, screen, x, yco);
+	tempscore -= (dig * 10000000);
+	x += 16;
+	dig = tempscore / 1000000;
+	drawdigit(dig, pix, screen, x, yco);
+	tempscore -= (dig * 1000000);
+	x += 16;
+	dig = tempscore / 100000;
+	drawdigit(dig, pix, screen, x, yco);
+	tempscore -= (dig * 100000);
+	x += 16;
+	dig = tempscore / 10000;
+	drawdigit(dig, pix, screen, x, yco);
+	tempscore -= (dig * 10000);
+	x += 16;
+	dig = tempscore / 1000;
+	drawdigit(dig, pix, screen, x, yco);
+	tempscore -= (dig * 1000);
+	x += 16;
+	dig = tempscore /100;
+	drawdigit(dig, pix, screen, x, yco);
+	tempscore -= (dig * 100);
+	x += 16;
+	dig = tempscore / 10;
+	drawdigit(dig, pix, screen, x, yco);
+	tempscore -= (dig * 10);
+	x += 16;
+	dig = tempscore;
+	drawdigit(dig, pix, screen, x, yco);
 }
 
 void drawPlayer(Player *play, Pixel *pix, Pixel *screen)
@@ -197,7 +286,7 @@ void movelog(Pixel *pix, Pixel *screen, Log *logpoi)
 		{
 			if (x >= 0 && x <= 1000)
 			{
-				pix->color = 0x964B00; //This should be brown;
+				pix->color = 0xF800; //This should be brown;
 				pix->x = x;
 				pix->y = y;
 				index = (y * 1000) + x;
@@ -211,6 +300,7 @@ int refreshscreen(Player *play, Pixel *pix, Pixel *screen, Car *carpoi, int carn
 {
 	drawBack(pix, screen);
 	for (int i = 0; i < lognum; i++) movelog(pix, screen, (logpoi + i));
+	drawscore(69420, pix, screen, 0, 0);
 	drawPlayer(play, pix, screen);
 	for (int i = 0; i < carnum; i++) movecar(pix, screen, (carpoi + i));
 	for (int i = 0; i < 704000; i++) drawPixel((screen + i));
