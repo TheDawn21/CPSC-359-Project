@@ -6,8 +6,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include "numgraphics.h"
+#include "gamestatgraph.h"
 
-//What we want to do with this program is read for input from the SNES controller in one thread, and refresh the screen at a rate of 24 frames per second.
+//What we want to do with this program is read for input from the SNES controller in one thread, and refresh the screen at a rate of 48 frames per second.
 //We'll move a small 32 x 32 pixel box within a larger box. So, if one of the D-Pad buttons is pressed on the controller, the box'll move 32 pixels in that direction.
 //Let's say the box moves 2 pixels per frame, so it would take 16 frames to make a move. 
 
@@ -19,6 +20,7 @@ typedef struct game
 	int time;
 	int score;
 	int level;
+	int sectick;
 } Game;
 
 void initgame(Game *gamepoi)
@@ -27,6 +29,7 @@ void initgame(Game *gamepoi)
 	gamepoi->time = 90;
 	gamepoi->score = 0;
 	gamepoi->level = 1;
+	gamepoi->sectick = 48;
 }
 
 typedef struct {
@@ -62,36 +65,36 @@ void drawPixel(Pixel *pixel){
 void drawBack(Pixel *pix, Pixel *screen)
 {
 	int index;
-	for (int y = 0; y < 32; y++) //First loop will draw a red strip at the top of the screen
+	for (int y = 40; y < 72; y++) //First loop will draw a red strip at the top of the screen
 	{
-		for (int x = 0; x < 1000; x++)
+		for (int x = 40; x < 1240; x++)
 		{
 			pix->color = 0xF800;
 			pix->x = x;
 			pix->y = y;
-			index = (y * 1000) + x;
+			index = (y * 1280) + x;
 			screen[index] = *pix;
 		}
 	}
-	for (int y = 32; y < 160; y++) //Second loop draws a blue strip (the river)
+	for (int y = 72; y < 200; y++) //Second loop draws a blue strip (the river)
 	{
-		for (int x = 0; x < 1000; x++)
+		for (int x = 40; x < 1240; x++)
 		{
 			pix->color = 0xFF;
 			pix->x = x;
 			pix->y = y;
-			index = (y * 1000) + x;
+			index = (y * 1280) + x;
 			screen[index] = *pix;
 		}
 	}
-	for (int y = 160; y < 704; y++)
+	for (int y = 200; y < 680; y++)
 	{
-		for (int x = 0; x < 1000; x++)
+		for (int x = 40; x < 1240; x++)
 		{
 			pix->color = 0xF800;
 			pix->x = x;
 			pix->y = y;
-			index = (y * 1000) + x;
+			index = (y * 1280) + x;
 			screen[index] = *pix;
 		}
 	}
@@ -125,7 +128,7 @@ void drawdigit(int digit, Pixel *pix, Pixel *screen, int xco, int yco)
 					indexa++;
 					pix->x = x;
 					pix->y = y;
-					indexb = (y * 1000) + x;
+					indexb = (y * 1280) + x;
 					screen[indexb] = *pix;
 				}
 			}
@@ -184,7 +187,7 @@ void drawPlayer(Player *play, Pixel *pix, Pixel *screen)
 			pix->color = 0xF00; //Hopefully this will be green
 			pix->x = x;
 			pix->y = y;
-			index = (y * 1000) + x;
+			index = (y * 1280) + x;
 			screen[index] = *pix; //Places the player pixel into the "screen" array of pixels
 		}
 	}
@@ -194,8 +197,8 @@ void movecar(Pixel *pix, Pixel *screen, Car *carpoi)
 {
 	int x = carpoi->posx;
 	x += carpoi->speed;
-	if (x > 1000 && carpoi->speed > 0) x = -(carpoi->width); //If the car is moving from left to right and moves beyond the right bound, respawn it on the left side
-	if (x < -(carpoi->width) && carpoi->speed < 0) x = 1000 + carpoi->width; //If the car is moving from right to left and moves beyond the left bound, respawn it on the right side.
+	if (x > 1240 && carpoi->speed > 0) x = 40 - carpoi->width; //If the car is moving from left to right and moves beyond the right bound, respawn it on the left side
+	if (x < (40 - carpoi->width) && carpoi->speed < 0) x = 1240 + carpoi->width; //If the car is moving from right to left and moves beyond the left bound, respawn it on the right side.
 	carpoi->posx = x;
 	int y = carpoi->posy;
 	int index;
@@ -205,12 +208,12 @@ void movecar(Pixel *pix, Pixel *screen, Car *carpoi)
 	{
 		for (x = carpoi->posx; x < xend; x++)
 		{
-			if (x >= 0 && x <= 1000)	//We only want to place a pixel into the screen array if it's in these bounds
+			if (x >= 40 && x <= 1240)	//We only want to place a pixel into the screen array if it's in these bounds
 			{
 				pix->color = 0xFF; //This should be blue
 				pix->x = x;
 				pix->y = y;
-				index = (y * 1000) + x;
+				index = (y * 1280) + x;
 				screen[index] = *pix;
 			}
 		}
@@ -265,16 +268,16 @@ int checklog(Player *play, Log *logpoi, int lognum)
 			}
 		}
 	}
-	play->posx = 0; //If the player isn't on a log, return them to the top-left corner
-	play->posy = 0;
+	play->posx = 552; //If the player isn't on a log, return them to the top-left corner
+	play->posy = 520;
 	return 0;
 }
 
 void movelog(Pixel *pix, Pixel *screen, Log *logpoi)
 {
 	logpoi->posx += logpoi->speed;
-	if (logpoi->posx > 1000 && logpoi->speed > 0) logpoi->posx = -(logpoi->width);
-	if (logpoi->posx < -(logpoi->width) && logpoi->speed < 0) logpoi->posx = 1000 + logpoi->width;
+	if (logpoi->posx > 1240 && logpoi->speed > 0) logpoi->posx = 40 -(logpoi->width);
+	if (logpoi->posx < 40 -(logpoi->width) && logpoi->speed < 0) logpoi->posx = 1240 + logpoi->width;
 	int x = logpoi->posx;
 	int y = logpoi->posy;
 	int index;
@@ -284,82 +287,82 @@ void movelog(Pixel *pix, Pixel *screen, Log *logpoi)
 	{
 		for (x = logpoi->posx; x < xend; x++)
 		{
-			if (x >= 0 && x <= 1000)
+			if (x >= 40 && x <= 1240)
 			{
 				pix->color = 0xF800; //This should be brown;
 				pix->x = x;
 				pix->y = y;
-				index = (y * 1000) + x;
+				index = (y * 1280) + x;
 				screen[index] = *pix;
 			}
 		}
 	}
 }
 
-int refreshscreen(Player *play, Pixel *pix, Pixel *screen, Car *carpoi, int carnum, Log *logpoi, int lognum)
+int refreshscreen(Player *play, Pixel *pix, Pixel *screen, Car *carpoi, int carnum, Log *logpoi, int lognum, Game * gamepoi)
 {
 	drawBack(pix, screen);
 	for (int i = 0; i < lognum; i++) movelog(pix, screen, (logpoi + i));
-	drawscore(69420, pix, screen, 0, 0);
+	drawscore(gamepoi->score, pix, screen, 0, 0);
 	drawPlayer(play, pix, screen);
 	for (int i = 0; i < carnum; i++) movecar(pix, screen, (carpoi + i));
 	for (int i = 0; i < 704000; i++) drawPixel((screen + i));
 	if (checkcollision(play, carpoi, carnum) == 1) return 1; //We need to return some value if the player's hit by a car to interrupt the moveplayer method
 }
 
-void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen, Car *carpoi, int carnum, Log *logpoi, int lognum) 
+void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen, Car *carpoi, int carnum, Log *logpoi, int lognum, Game * gamepoi) 
 {
 	int x = play->posx;
 	int y = play->posy;
 	int i;
 	if ((bitfield & U_DIR) == 0)
 	{
-		if ((y - 32) >= 0) //If (y - 32) < 0, then moving up would move the player out of bounds (which would be bad)
+		if ((y - 32) >= 40) //If (y - 32) < 40, then moving up would move the player out of bounds (which would be bad)
 		{
-			for (i = 0; i < 16; i++)
+			for (i = 0; i < 8; i++)
 			{
-				y -= 2;
+				y -= 4;
 				play->posy = y;
-				if (refreshscreen(play, pix, screen, carpoi, carnum, logpoi, lognum) == 1) break;
+				if (refreshscreen(play, pix, screen, carpoi, carnum, logpoi, lognum, gamepoi) == 1) break;
 				Wait(20833);
 			}
 		}
 	}
 	else if ((bitfield & D_DIR) == 0)
 	{
-		if ((y + 32) <= 672)
+		if ((y + 32) <= 520)
 		{
-			for (i = 0; i < 16; i++)
+			for (i = 0; i < 8; i++)
 			{
-				y += 2;
+				y += 4;
 				play->posy = y;
-				if (refreshscreen(play, pix, screen, carpoi, carnum, logpoi, lognum) == 1) break;
+				if (refreshscreen(play, pix, screen, carpoi, carnum, logpoi, lognum, gamepoi) == 1) break;
 				Wait(20833);
 			}
 		}
 	}
 	else if ((bitfield & L_DIR) == 0)
 	{
-		if ((x - 32) >= 0)
+		if ((x - 32) >= 40)
 		{
-			for (i = 0; i < 16; i++)
+			for (i = 0; i < 8; i++)
 			{
-				x -= 2;
+				x -= 4;
 				play->posx = x;
-				if (refreshscreen(play, pix, screen, carpoi, carnum, logpoi, lognum) == 1) break;
+				if (refreshscreen(play, pix, screen, carpoi, carnum, logpoi, lognum, gamepoi) == 1) break;
 				Wait(20833);
 			}	
 		}
 	}
 	else if ((bitfield & R_DIR) == 0)
 	{
-		if ((x + 32) <= 960)
+		if ((x + 32) <= 1240)
 		{
-			for (i = 0; i < 16; i++)
+			for (i = 0; i < 8; i++)
 			{
-				x += 2;
+				x += 4;
 				play->posx = x;
-				if (refreshscreen(play, pix, screen, carpoi, carnum, logpoi, lognum) == 1) break;
+				if (refreshscreen(play, pix, screen, carpoi, carnum, logpoi, lognum, gamepoi) == 1) break;
 				Wait(20833);
 			}	
 		}
@@ -378,17 +381,19 @@ int main(int argc, char **argv)
 	Player *play;
 	play = malloc(sizeof(Player));
 	Pixel *screen;
-	screen = (Pixel *)malloc(704000 * sizeof(Pixel)); //This will create an array of pixels
+	screen = (Pixel *)malloc((1280 * 720) * sizeof(Pixel)); //This will create an array of pixels
 	Car *npo;
 	npo = (Car *)malloc(8 * sizeof(Car));
 	Log *logarr; 
 	logarr = (Log *)malloc(16 * sizeof(Log));
+	Game *gamepoi;
+	gamepoi = (Game *)malloc(sizeof(Game));
 	int pos = 0;
 	int i;
 	for (i = 0; i < 4; i++)
 	{
 		npo[i].width = 48;		//128
-		npo[i].posy = 192;		// 64
+		npo[i].posy = 232;		// 64
 		npo[i].posx = pos;		//192
 		pos += 256;
 		npo[i].speed = 4;
@@ -397,7 +402,7 @@ int main(int argc, char **argv)
 	for (i = 4; i < 8; i++)
 	{
 		npo[i].width = 48;
-		npo[i].posy = 224;
+		npo[i].posy = 264;
 		npo[i].posx = pos;
 		pos -= 256;
 		npo[i].speed = -4;
@@ -406,7 +411,7 @@ int main(int argc, char **argv)
 	for (i = 0; i < 4; i++)
 	{
 		logarr[i].width = 48;
-		logarr[i].posy = 32;
+		logarr[i].posy = 72;
 		logarr[i].posx = pos;
 		pos += 256;
 		logarr[i].speed = 4;
@@ -415,7 +420,7 @@ int main(int argc, char **argv)
 	for (i = 4; i < 8; i++)
 	{
 		logarr[i].width = 48;
-		logarr[i].posy = 64;
+		logarr[i].posy = 104;
 		logarr[i].posx = pos;
 		pos -= 256;
 		logarr[i].speed = -4;
@@ -424,7 +429,7 @@ int main(int argc, char **argv)
 	for (i = 8; i < 12; i++)
 	{
 		logarr[i].width = 48;
-		logarr[i].posy = 96;
+		logarr[i].posy = 136;
 		logarr[i].posx = pos;
 		pos += 256;
 		logarr[i].speed = 4;
@@ -433,26 +438,29 @@ int main(int argc, char **argv)
 	for (i = 12; i < 16; i++)
 	{
 		logarr[i].width = 48;
-		logarr[i].posy = 128;
+		logarr[i].posy = 168;
 		logarr[i].posx = pos;
 		pos -= 256;
 		logarr[i].speed = -4;
 	}
 	
-	play->posy = 32;
-	play->posx = 32;
+	play->posy = 520;
+	play->posx = 552;
 	
 	unsigned short button = NOBUTT;
 	
-	refreshscreen(play, pix, screen, npo, 8, logarr, 16);
+	refreshscreen(play, pix, screen, npo, 8, logarr, 16, gamepoi);
 	
 	int looptrue = 1;
 	while (looptrue)
 	{
 		button = Read_SNES(gpio);
-		moveplayer(play, pix, button, screen, npo, 8, logarr, 16);
-		if (checkwater(play, 32, 159) == 1) checklog(play, logarr, 16); //We don't want to check if the player's on a log until they have completeted a "leap"
-		refreshscreen(play, pix, screen, npo, 8, logarr, 16);
+		moveplayer(play, pix, button, screen, npo, 8, logarr, 16, gamepoi);
+		if (checkwater(play, 72, 168) == 1) 
+		{
+			if (checklog(play, logarr, 16) == 0) gamepoi->life--;
+		} //We don't want to check if the player's on a log until they have completeted a "leap" 
+		refreshscreen(play, pix, screen, npo, 8, logarr, 16, gamepoi);
 		Wait(20833);
 		if ((button & START_B) == 0) looptrue = 0;
 	}
@@ -462,6 +470,7 @@ int main(int argc, char **argv)
 	free(screen);
 	free(npo);
 	free(logarr);
+	free(gamepoi);
 	
 	return 0;
 }
