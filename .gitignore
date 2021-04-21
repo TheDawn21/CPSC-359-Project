@@ -1,0 +1,4 @@
+driverutils.o
+framebuffer.o
+graphictest.o
+graphictest
