@@ -7,11 +7,19 @@
 #include <unistd.h>
 #include "numgraphics.h"
 #include "gamestatgraph.h"
+#include "frog.h"
 
 //What we want to do with this program is read for input from the SNES controller in one thread, and refresh the screen at a rate of 48 frames per second.
 //We'll move a small 32 x 32 pixel box within a larger box. So, if one of the D-Pad buttons is pressed on the controller, the box'll move 32 pixels in that direction.
 //Let's say the box moves 2 pixels per frame, so it would take 16 frames to make a move. 
 
+int widthStart = 320;
+int widthEnd = 960;
+
+short int grass = 0x2B44;
+short int water = 0x194C;
+short int pavement = 0x2946;
+short int carPlaceholder = 0x2AEE;
 struct fbs framebufferstruct;
 
 typedef struct game
@@ -33,7 +41,7 @@ void initgame(Game *gamepoi)
 }
 
 typedef struct {
-	short color;
+	short int color;
 	int x, y;
 } Pixel;
 
@@ -65,36 +73,36 @@ void drawPixel(Pixel *pixel){
 void drawBack(Pixel *pix, Pixel *screen)
 {
 	int index;
-	for (int y = 40; y < 72; y++) //First loop will draw a red strip at the top of the screen
+	for (int y = 8; y < 72; y++) //First loop will draw a red strip at the top of the screen
 	{
-		for (int x = 40; x < 1240; x++)
+		for (int x = widthStart; x < widthEnd; x++)
 		{
-			pix->color = 0xF800;
+			pix->color = grass;
 			pix->x = x;
 			pix->y = y;
-			index = (y * 1280) + x;
+			index = (y * 640) + x;
 			screen[index] = *pix;
 		}
 	}
 	for (int y = 72; y < 200; y++) //Second loop draws a blue strip (the river)
 	{
-		for (int x = 40; x < 1240; x++)
+		for (int x = widthStart; x < widthEnd; x++)
 		{
-			pix->color = 0xFF;
+			pix->color = water;
 			pix->x = x;
 			pix->y = y;
-			index = (y * 1280) + x;
+			index = (y * 640) + x;
 			screen[index] = *pix;
 		}
 	}
 	for (int y = 200; y < 680; y++)
 	{
-		for (int x = 40; x < 1240; x++)
+		for (int x = widthStart; x < widthEnd; x++)
 		{
-			pix->color = 0xF800;
+			pix->color = grass;
 			pix->x = x;
 			pix->y = y;
-			index = (y * 1280) + x;
+			index = (y * 640) + x;
 			screen[index] = *pix;
 		}
 	}
@@ -177,18 +185,21 @@ void drawPlayer(Player *play, Pixel *pix, Pixel *screen)
 {
 	int x = play->posx;
 	int y = play->posy;
-	int index;
-	int xend = x + 31;
-	int yend = y + 31;
-	for (y; y < yend; y++)
+	int i = 0;
+	int xend = x + 32;
+	int yend = y + 32;
+	short int *frogPtr = (short int *) frogImage.pixel_data;
+	unsigned int quarter,byte,word;
+	for (y = play->posy; y < yend; y++)
 	{
 		for (x = play->posx; x < xend; x++)
 		{
-			pix->color = 0xF00; //Hopefully this will be green
+			pix->color = frogPtr[i]; //Hopefully this will be green
 			pix->x = x;
 			pix->y = y;
-			index = (y * 1280) + x;
+			int index = (y * 640) + x;
 			screen[index] = *pix; //Places the player pixel into the "screen" array of pixels
+			i++;
 		}
 	}
 }
@@ -197,8 +208,8 @@ void movecar(Pixel *pix, Pixel *screen, Car *carpoi)
 {
 	int x = carpoi->posx;
 	x += carpoi->speed;
-	if (x > 1240 && carpoi->speed > 0) x = 40 - carpoi->width; //If the car is moving from left to right and moves beyond the right bound, respawn it on the left side
-	if (x < (40 - carpoi->width) && carpoi->speed < 0) x = 1240 + carpoi->width; //If the car is moving from right to left and moves beyond the left bound, respawn it on the right side.
+	if (x > widthEnd && carpoi->speed > 0) x = widthStart - carpoi->width; //If the car is moving from left to right and moves beyond the right bound, respawn it on the left side
+	if (x < (widthStart - carpoi->width) && carpoi->speed < 0) x = widthEnd + carpoi->width; //If the car is moving from right to left and moves beyond the left bound, respawn it on the right side.
 	carpoi->posx = x;
 	int y = carpoi->posy;
 	int index;
@@ -208,12 +219,12 @@ void movecar(Pixel *pix, Pixel *screen, Car *carpoi)
 	{
 		for (x = carpoi->posx; x < xend; x++)
 		{
-			if (x >= 40 && x <= 1240)	//We only want to place a pixel into the screen array if it's in these bounds
+			if (x >= widthStart && x <= widthEnd)	//We only want to place a pixel into the screen array if it's in these bounds
 			{
-				pix->color = 0xFF; //This should be blue
+				pix->color = carPlaceholder; //This should be blue
 				pix->x = x;
 				pix->y = y;
-				index = (y * 1280) + x;
+				index = (y * 640) + x;
 				screen[index] = *pix;
 			}
 		}
@@ -229,14 +240,14 @@ int checkcollision(Player *play, Car *carpoi, int carnum)
 			if ((carpoi + i)->speed < 0 && (play->posx + 31) > (carpoi + i)->posx && play->posx < (carpoi + i)->posx + ((carpoi + i)->width - 1))
 			{
 				//That logical statement is a bit complicated, but basically it means that if the car is moving left, and the player is within a certain range of it, they'll get hit
-				play->posx = 0;
-				play->posy = 0; //For now, if the player gets hit, all we'll do is move them to the corner.
+				play->posx = 640;
+				play->posy = 648; //For now, if the player gets hit, all we'll do is move them to the corner.
 				return 1;
 			}
 			if ((carpoi + i)->speed > 0 && play->posx > (carpoi + i)->posx && (play->posx) < ((carpoi + i)->posx + ((carpoi + i)->width - 1)))
 			{
-				play->posx = 0;
-				play->posy = 0;
+				play->posx = 640;
+				play->posy = 648;
 				return 1;
 			}
 		}
@@ -260,7 +271,7 @@ int checklog(Player *play, Log *logpoi, int lognum)
 	{
 		if (play->posy == (logpoi + i)->posy) //Check if the player is within a certain vertical range from the log
 		{
-			if ((play->posx + 31) > (logpoi + i)->posx && play->posx < ((logpoi + i)->posx + ((logpoi + i)->width - 1)))
+			if ((play->posx + 31) > (logpoi + i)->posx && play->posx < ((logpoi + i)->posx + ((logpoi + i)->width - 1)) && (play->posx + 31 <= widthEnd) && (play->posx - 31 >= widthStart))
 			{
 				//The above if statement checks if the player is within a certain horizontal range of the log
 				play->posx += (logpoi + i)->speed; //Moves the player along with the log
@@ -268,16 +279,16 @@ int checklog(Player *play, Log *logpoi, int lognum)
 			}
 		}
 	}
-	play->posx = 552; //If the player isn't on a log, return them to the top-left corner
-	play->posy = 520;
+	play->posx = 640; //If the player isn't on a log, return them to the top-left corner
+	play->posy = 648;
 	return 0;
 }
 
 void movelog(Pixel *pix, Pixel *screen, Log *logpoi)
 {
 	logpoi->posx += logpoi->speed;
-	if (logpoi->posx > 1240 && logpoi->speed > 0) logpoi->posx = 40 -(logpoi->width);
-	if (logpoi->posx < 40 -(logpoi->width) && logpoi->speed < 0) logpoi->posx = 1240 + logpoi->width;
+	if (logpoi->posx > widthEnd && logpoi->speed > 0) logpoi->posx = widthStart -(logpoi->width);
+	if (logpoi->posx < widthStart -(logpoi->width) && logpoi->speed < 0) logpoi->posx = widthEnd + logpoi->width;
 	int x = logpoi->posx;
 	int y = logpoi->posy;
 	int index;
@@ -287,12 +298,12 @@ void movelog(Pixel *pix, Pixel *screen, Log *logpoi)
 	{
 		for (x = logpoi->posx; x < xend; x++)
 		{
-			if (x >= 40 && x <= 1240)
+			if (x >= widthStart && x <= widthEnd)
 			{
-				pix->color = 0xF800; //This should be brown;
+				pix->color = 0x4185; //This should be brown;
 				pix->x = x;
 				pix->y = y;
-				index = (y * 1280) + x;
+				index = (y * 640) + x;
 				screen[index] = *pix;
 			}
 		}
@@ -317,7 +328,7 @@ void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen
 	int i;
 	if ((bitfield & U_DIR) == 0)
 	{
-		if ((y - 32) >= 40) //If (y - 32) < 40, then moving up would move the player out of bounds (which would be bad)
+		if ((y - 32) >= 8) //If (y - 32) < 40, then moving up would move the player out of bounds (which would be bad)
 		{
 			for (i = 0; i < 8; i++)
 			{
@@ -330,7 +341,7 @@ void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen
 	}
 	else if ((bitfield & D_DIR) == 0)
 	{
-		if ((y + 32) <= 520)
+		if ((y + 32) <= 680)
 		{
 			for (i = 0; i < 8; i++)
 			{
@@ -343,7 +354,7 @@ void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen
 	}
 	else if ((bitfield & L_DIR) == 0)
 	{
-		if ((x - 32) >= 40)
+		if ((x - 32) >= widthStart)
 		{
 			for (i = 0; i < 8; i++)
 			{
@@ -356,7 +367,7 @@ void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen
 	}
 	else if ((bitfield & R_DIR) == 0)
 	{
-		if ((x + 32) <= 1240)
+		if ((x + 32) <= widthEnd)
 		{
 			for (i = 0; i < 8; i++)
 			{
@@ -380,7 +391,7 @@ int main(int argc, char **argv)
 	pix = malloc(sizeof(Pixel));
 	Player *play;
 	play = malloc(sizeof(Player));
-	Pixel *screen;
+	Pixel *screen;	
 	screen = (Pixel *)malloc((1280 * 720) * sizeof(Pixel)); //This will create an array of pixels
 	Car *npo;
 	npo = (Car *)malloc(8 * sizeof(Car));
@@ -444,8 +455,8 @@ int main(int argc, char **argv)
 		logarr[i].speed = -4;
 	}
 	
-	play->posy = 520;
-	play->posx = 552;
+	play->posy = 648;
+	play->posx = 640;
 	
 	unsigned short button = NOBUTT;
 	
