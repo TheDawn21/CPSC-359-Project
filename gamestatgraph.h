@@ -2,3 +2,4 @@
 #include "lifegraph.h"
 #include "scoregraph.h"
 #include "timegraph.h"
+#include "stepgraph.h"

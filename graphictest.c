@@ -31,6 +31,9 @@ typedef struct game
 	int score;
 	int level;
 	int sectick;
+	int step;
+	short wintrue;
+	short losstrue;
 } Game;
 
 void initgame(Game *gamepoi)
@@ -40,6 +43,9 @@ void initgame(Game *gamepoi)
 	gamepoi->score = 0;
 	gamepoi->level = 1;
 	gamepoi->sectick = 0;
+	gamepoi->step = 99;
+	gamepoi->wintrue = 0;
+	gamepoi->losstrue = 0;
 }
 
 typedef struct {
@@ -199,6 +205,35 @@ void drawscore(int score, Pixel *pix, Pixel *screen, int xco, int yco)
 	x += 16;
 	dig = tempscore;
 	drawdigit(dig, pix, screen, x, yco);
+}
+
+void drawsteps(int steps, Pixel *pix, Pixel *screen, int xco, int yco)
+{
+	short *colorpoint;
+	colorpoint = (short *)stepgraph.pixel_data;
+	int indexa = 0;
+	int indexb;
+	int x;
+	for (int y = yco; y < (yco + 16); y++)
+	{
+		for (x = xco; x < (xco + 64); x++)
+		{
+			pix->color = colorpoint[indexa];
+			indexa++;
+			pix->x = x;
+			pix->y = y;
+			indexb = (y * 1280) + x;
+			screen[indexb] = *pix;
+		}
+	}
+	x = xco + 64;
+	int tempstep = steps;
+	int dig = tempstep / 10;
+	drawdigit(dig, pix, screen, x, yco);
+	x += 16;
+	tempstep -= (dig * 10);
+	dig = tempstep;
+	drawdigit (dig, pix, screen, x, yco);
 }
 
 void drawlives(int lifecount, Pixel *pix, Pixel *screen, int xco, int yco)
@@ -435,6 +470,7 @@ int refreshscreen(Player *play, Pixel *pix, Pixel *screen, Car *carpoi, int carn
 	drawscore(gamepoi->score, pix, screen, 0, 0);
 	drawlives(gamepoi->life, pix, screen, 320, 0);
 	drawlevel(gamepoi->level, screen, pix, 640, 0);
+	drawsteps(gamepoi->step, pix, screen, 960, 0);
 	gamepoi->sectick = gamepoi->sectick + 1;
 	if (gamepoi->sectick % 48 == 0)
 	{
@@ -464,6 +500,46 @@ void blackscreen(Pixel *screen, Pixel *pix)
 	}
 }
 
+int checklevel(Player *play)
+{
+	//This method will check if the player has reached the end of the level, ie the top of the screen, ie y-coordinate 40
+	//If they've reached the end, it will return 1, if not, it will return 0
+	if (play->posy == 40) {return 1;}
+	else {return 0;}
+	//easy peasy :~)
+}
+
+int checkwin(Game *gamepoi)
+{
+	//The win condition of the game is to get past the fourth level, so if the level attribute in the game structure is greater than 4, the player won
+	if (gamepoi->level > 4)
+	{
+		gamepoi->wintrue = 1;
+		return 1;
+	}
+	else {return 0;}
+}
+
+int checkloss(Game *gamepoi)
+{
+	if (gamepoi->life <= 0) //Normally I'd say that the 0th life should count as a life, but in the specs it said to end the game if the player has 0 lives, so...
+	{
+		gamepoi->losstrue = 1;
+		return 1;
+	}
+	if (gamepoi->step <= 0)
+	{
+		gamepoi->losstrue = 1;
+		return 1;
+	}
+	if (gamepoi->time <= 0)
+	{
+		gamepoi->losstrue = 1;
+		return 1;
+	}
+	else {return 0;}
+}
+
 void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen, Car *carpoi, int carnum, Log *logpoi, int lognum, Game * gamepoi) 
 {
 	int x = play->posx;
@@ -471,6 +547,7 @@ void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen
 	int i;
 	if ((bitfield & U_DIR) == 0)
 	{
+		gamepoi->step--;
 		if ((y - 32) >= heightstart) //If (y - 32) < 40, then moving up would move the player out of bounds (which would be bad)
 		{
 			for (i = 0; i < 8; i++)
@@ -617,6 +694,17 @@ int main(int argc, char **argv)
 			if (checklog(play, logarr, 16) == 0) gamepoi->life--;
 		} //We don't want to check if the player's on a log until they have completeted a "leap" 
 		refreshscreen(play, pix, screen, npo, 8, logarr, 16, gamepoi);
+		if (checklevel(play) == 1)
+		{
+			gamepoi->score += ((gamepoi->step + gamepoi->time) * 5);
+			gamepoi->step = 99;
+			gamepoi->time = 90;
+			gamepoi->level++;
+			play->posy = 648;
+			play->posx = 640;
+		}
+		if (checkwin(gamepoi)) looptrue = 0;
+		if (checkloss(gamepoi)) looptrue = 0;
 		Wait(20833);
 		if ((button & START_B) == 0) looptrue = 0;
 	}
