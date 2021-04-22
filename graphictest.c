@@ -15,6 +15,8 @@
 
 int widthStart = 320;
 int widthEnd = 960;
+int heightstart = 40;
+int heightend = 680;
 
 short int grass = 0x2B44;
 short int water = 0x194C;
@@ -37,7 +39,7 @@ void initgame(Game *gamepoi)
 	gamepoi->time = 90;
 	gamepoi->score = 0;
 	gamepoi->level = 1;
-	gamepoi->sectick = 48;
+	gamepoi->sectick = 0;
 }
 
 typedef struct {
@@ -73,14 +75,14 @@ void drawPixel(Pixel *pixel){
 void drawBack(Pixel *pix, Pixel *screen)
 {
 	int index;
-	for (int y = 8; y < 72; y++) //First loop will draw a red strip at the top of the screen
+	for (int y = 40; y < 72; y++) //First loop will draw a red strip at the top of the screen
 	{
 		for (int x = widthStart; x < widthEnd; x++)
 		{
 			pix->color = grass;
 			pix->x = x;
 			pix->y = y;
-			index = (y * 640) + x;
+			index = (y *1280) + x;
 			screen[index] = *pix;
 		}
 	}
@@ -91,7 +93,7 @@ void drawBack(Pixel *pix, Pixel *screen)
 			pix->color = water;
 			pix->x = x;
 			pix->y = y;
-			index = (y * 640) + x;
+			index = (y * 1280) + x;
 			screen[index] = *pix;
 		}
 	}
@@ -102,7 +104,7 @@ void drawBack(Pixel *pix, Pixel *screen)
 			pix->color = grass;
 			pix->x = x;
 			pix->y = y;
-			index = (y * 640) + x;
+			index = (y * 1280) + x;
 			screen[index] = *pix;
 		}
 	}
@@ -149,6 +151,24 @@ void drawscore(int score, Pixel *pix, Pixel *screen, int xco, int yco)
 	int dig;
 	int x = xco;
 	int tempscore = score;
+	//First we have to draw the "scoregraph" graphic.
+	short * colorpoint;
+	colorpoint = (short *)scoregraph.pixel_data;
+	int indexa = 0;
+	int indexb;
+	for (int y = yco; y < yco + 16; y++)
+	{
+		for (x = xco; x < (xco + 64); x++)
+		{
+			pix->color = colorpoint[indexa];
+			indexa++;
+			pix->x = x;
+			pix->y = y;
+			indexb = (y * 1280) + x;
+			screen[indexb] = *pix;
+		}
+	}
+	x = xco + 64;
 	dig = tempscore / 10000000;
 	drawdigit(dig, pix, screen, x, yco);
 	tempscore -= (dig * 10000000);
@@ -181,6 +201,35 @@ void drawscore(int score, Pixel *pix, Pixel *screen, int xco, int yco)
 	drawdigit(dig, pix, screen, x, yco);
 }
 
+void drawlives(int lifecount, Pixel *pix, Pixel *screen, int xco, int yco)
+{
+	short *colorpoint;
+	colorpoint = (short *)lifegraph.pixel_data;
+	int indexa = 0;
+	int indexb;
+	int x;
+	for (int y = yco; y < (yco + 16); y++)
+	{
+		for (x = xco; x < (xco + 64); x++)
+		{
+			pix->color = colorpoint[indexa];
+			indexa++;
+			pix->x = x;
+			pix->y = y;
+			indexb = (y * 1280) + x;
+			screen[indexb] = *pix;
+		}
+	}
+	x = xco + 64;
+	int templife = lifecount;
+	int dig = templife / 10;
+	drawdigit(dig, pix, screen, x, yco);
+	x += 16;
+	templife -= (dig * 10);
+	dig = templife;
+	drawdigit (dig, pix, screen, x, yco);
+}
+
 void drawPlayer(Player *play, Pixel *pix, Pixel *screen)
 {
 	int x = play->posx;
@@ -197,7 +246,7 @@ void drawPlayer(Player *play, Pixel *pix, Pixel *screen)
 			pix->color = frogPtr[i]; //Hopefully this will be green
 			pix->x = x;
 			pix->y = y;
-			int index = (y * 640) + x;
+			int index = (y * 1280) + x;
 			screen[index] = *pix; //Places the player pixel into the "screen" array of pixels
 			i++;
 		}
@@ -224,7 +273,7 @@ void movecar(Pixel *pix, Pixel *screen, Car *carpoi)
 				pix->color = carPlaceholder; //This should be blue
 				pix->x = x;
 				pix->y = y;
-				index = (y * 640) + x;
+				index = (y * 1280) + x;
 				screen[index] = *pix;
 			}
 		}
@@ -303,9 +352,78 @@ void movelog(Pixel *pix, Pixel *screen, Log *logpoi)
 				pix->color = 0x4185; //This should be brown;
 				pix->x = x;
 				pix->y = y;
-				index = (y * 640) + x;
+				index = (y * 1280) + x;
 				screen[index] = *pix;
 			}
+		}
+	}
+}
+
+void drawlevel(int curlevel, Pixel *screen, Pixel *pix, int xco, int yco)
+{
+	int x;
+	short *colorpoint;
+	colorpoint = (short *)levelstat.pixel_data;
+	int indexa = 0;
+	int indexb;
+	for (int y = yco; y < (yco + 16); y++)
+	{
+		for (x = xco; x < (xco + 64); x++)
+		{
+			pix->color = colorpoint[indexa];
+			indexa++;
+			pix->x = x;
+			pix->y = y;
+			indexb = (y * 1280) + x;
+			screen[indexb] = *pix;
+		}
+	}
+	x = xco + 64;
+	drawdigit(curlevel, pix, screen, x, yco);
+}
+
+void drawtime(int curtime, Pixel *pix, Pixel *screen, int xco, int yco)
+{
+	int x;
+	short *colorpoint;
+	colorpoint = (short *)timegraph.pixel_data;
+	int indexa = 0;
+	int indexb;
+	for (int y = yco; y < (yco + 16); y++)
+	{
+		for (x = xco; x < (xco + 64); x++)
+		{
+			pix->color = colorpoint[indexa];
+			indexa++;
+			pix->x = x;
+			pix->y = y;
+			indexb = (y * 1280) + x;
+			screen[indexb] = *pix;
+		}
+	}
+	x = xco + 64;
+	int xend = x + (90 * 8);
+	for (int y = yco; y < yco + 16; y++)
+	{
+		for (x = xco + 64; x < xend; x++)
+		{
+			pix->color = 0; //Black pixel
+			pix->x = x;
+			pix->y = y;
+			indexb = (y * 1280) + x;
+			screen[indexb] = *pix;
+		}
+	}
+	xend = (xco + 64) + (curtime * 8);
+	for (int y = yco; y < yco + 16; y++)
+	{
+		for (x = xco + 64; x < xend; x++)
+		{
+			pix->color = 0xFFFF; //White pixel
+			pix->x = x;
+			pix->y = y;
+			indexb = (y * 1280) + x;
+			screen[indexb] = *pix;
 		}
 	}
 }
@@ -315,10 +433,35 @@ int refreshscreen(Player *play, Pixel *pix, Pixel *screen, Car *carpoi, int carn
 	drawBack(pix, screen);
 	for (int i = 0; i < lognum; i++) movelog(pix, screen, (logpoi + i));
 	drawscore(gamepoi->score, pix, screen, 0, 0);
+	drawlives(gamepoi->life, pix, screen, 320, 0);
+	drawlevel(gamepoi->level, screen, pix, 640, 0);
+	gamepoi->sectick = gamepoi->sectick + 1;
+	if (gamepoi->sectick % 48 == 0)
+	{
+		gamepoi->time = gamepoi->time - 1;
+	}
+	if (gamepoi->time >= 0) drawtime(gamepoi->time, pix, screen, 20, 696);
 	drawPlayer(play, pix, screen);
 	for (int i = 0; i < carnum; i++) movecar(pix, screen, (carpoi + i));
-	for (int i = 0; i < 704000; i++) drawPixel((screen + i));
+	for (int i = 0; i < 921600; i++) drawPixel((screen + i));
 	if (checkcollision(play, carpoi, carnum) == 1) return 1; //We need to return some value if the player's hit by a car to interrupt the moveplayer method
+}
+
+void blackscreen(Pixel *screen, Pixel *pix)
+{
+	//This will set every pixel on the screen to black.
+	int index;
+	for (int y = 0; y < 720; y++)
+	{
+		for (int x = 0; x < 1280; x++)
+		{
+			pix->color = 0x000;
+			pix->x = x;
+			pix->y = y;
+			index = (y * 1280) + x;
+			screen[index] = *pix;
+		}
+	}
 }
 
 void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen, Car *carpoi, int carnum, Log *logpoi, int lognum, Game * gamepoi) 
@@ -328,7 +471,7 @@ void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen
 	int i;
 	if ((bitfield & U_DIR) == 0)
 	{
-		if ((y - 32) >= 8) //If (y - 32) < 40, then moving up would move the player out of bounds (which would be bad)
+		if ((y - 32) >= heightstart) //If (y - 32) < 40, then moving up would move the player out of bounds (which would be bad)
 		{
 			for (i = 0; i < 8; i++)
 			{
@@ -341,7 +484,7 @@ void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen
 	}
 	else if ((bitfield & D_DIR) == 0)
 	{
-		if ((y + 32) <= 680)
+		if ((y + 32) <= (heightend - 32))
 		{
 			for (i = 0; i < 8; i++)
 			{
@@ -367,7 +510,7 @@ void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen
 	}
 	else if ((bitfield & R_DIR) == 0)
 	{
-		if ((x + 32) <= widthEnd)
+		if ((x + 32) <= (widthEnd - 32))
 		{
 			for (i = 0; i < 8; i++)
 			{
@@ -460,6 +603,8 @@ int main(int argc, char **argv)
 	
 	unsigned short button = NOBUTT;
 	
+	initgame(gamepoi);
+	blackscreen(screen, pix);
 	refreshscreen(play, pix, screen, npo, 8, logarr, 16, gamepoi);
 	
 	int looptrue = 1;
