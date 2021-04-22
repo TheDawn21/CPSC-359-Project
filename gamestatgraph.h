@@ -3,3 +3,5 @@
 #include "scoregraph.h"
 #include "timegraph.h"
 #include "stepgraph.h"
+#include "boulder.h"
+#include "fence.h"

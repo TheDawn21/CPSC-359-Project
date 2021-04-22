@@ -53,6 +53,17 @@ typedef struct {
 	int x, y;
 } Pixel;
 
+typedef struct boulder
+{
+	int posy;
+	int posx;
+} Boulder;
+
+typedef struct fence
+{
+	int posy;
+	int posx;
+} Fence;
 
 typedef struct player
 {
@@ -76,6 +87,50 @@ typedef struct log
 void drawPixel(Pixel *pixel){
 	long int location = (pixel->x +framebufferstruct.xOff) * (framebufferstruct.bits/8) + (pixel->y+framebufferstruct.yOff) * framebufferstruct.lineLength;
 	*((unsigned short int*)(framebufferstruct.fptr + location)) = pixel->color;
+}
+
+void drawfence(Pixel *pix, Pixel *screen, Fence *object)
+{
+	short *colorpoint;
+	colorpoint = (short *)fencegraph.pixel_data;
+	int indexa = 0;
+	int indexb;
+	int xend = object->posx + 32;
+	int yend = object->posy + 32;
+	for (int y = object->posy; y < yend; y++)
+	{
+		for (int x = object->posx; x < xend; x++)
+		{
+			pix->color = colorpoint[indexa];
+			indexa++;
+			pix->x = x;
+			pix->y = y;
+			indexb = (y * 1280) + x;
+			screen[indexb] = *pix;
+		}
+	}
+}
+
+void drawrock(Pixel *pix, Pixel *screen, Boulder *object)
+{
+	short *colorpoint;
+	colorpoint = (short *)bouldgraph.pixel_data;
+	int indexa = 0;
+	int indexb;
+	int xend = object->posx + 32;
+	int yend = object->posy + 32;
+	for (int y = object->posy; y < yend; y++)
+	{
+		for (int x = object->posx; x < xend; x++)
+		{
+			pix->color = colorpoint[indexa];
+			indexa++;
+			pix->x = x;
+			pix->y = y;
+			indexb = (y * 1280) + x;
+			screen[indexb] = *pix;
+		}
+	}
 }
 
 void drawBack(Pixel *pix, Pixel *screen)
@@ -463,9 +518,11 @@ void drawtime(int curtime, Pixel *pix, Pixel *screen, int xco, int yco)
 	}
 }
 
-int refreshscreen(Player *play, Pixel *pix, Pixel *screen, Car *carpoi, int carnum, Log *logpoi, int lognum, Game * gamepoi)
+int refreshscreen(Player *play, Pixel *pix, Pixel *screen, Car *carpoi, int carnum, Log *logpoi, int lognum, Game * gamepoi, Boulder *boulpoi, Fence *fencepoi)
 {
 	drawBack(pix, screen);
+	drawrock(pix, screen, boulpoi);
+	drawfence(pix, screen, fencepoi);
 	for (int i = 0; i < lognum; i++) movelog(pix, screen, (logpoi + i));
 	drawscore(gamepoi->score, pix, screen, 0, 0);
 	drawlives(gamepoi->life, pix, screen, 320, 0);
@@ -480,7 +537,11 @@ int refreshscreen(Player *play, Pixel *pix, Pixel *screen, Car *carpoi, int carn
 	drawPlayer(play, pix, screen);
 	for (int i = 0; i < carnum; i++) movecar(pix, screen, (carpoi + i));
 	for (int i = 0; i < 921600; i++) drawPixel((screen + i));
-	if (checkcollision(play, carpoi, carnum) == 1) return 1; //We need to return some value if the player's hit by a car to interrupt the moveplayer method
+	if (checkcollision(play, carpoi, carnum) == 1)
+	{
+		gamepoi->life--;
+		return 1; //We need to return some value if the player's hit by a car to interrupt the moveplayer method
+	}
 }
 
 void blackscreen(Pixel *screen, Pixel *pix)
@@ -540,60 +601,86 @@ int checkloss(Game *gamepoi)
 	else {return 0;}
 }
 
-void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen, Car *carpoi, int carnum, Log *logpoi, int lognum, Game * gamepoi) 
+int checkrock(Player *play, Boulder *boulpoi, int boulnum, int xco, int yco)
+{
+	//This will check if there's a boulder on the space which the player is trying to move onto and return 1 if there is and 0 if there isn't
+	for (int i = 0; i < boulnum; i++)
+	{
+		if (xco >= (boulpoi + i)->posx && xco <= ((boulpoi + i)->posx + 31) && yco >= (boulpoi + i)->posy && yco <= ((boulpoi + i)->posy + 31)) return 1;
+		//The above if statement checks if the provided x and y coordinates are in the same square as the boulder
+	}
+	return 0; //If we exit the loop, then there is no boulder in the player's path and they can move.
+}
+
+int checkfence(Player *play, Fence *fencepoi, int fencenum, int xco, int yco)
+{
+	//This will check if there's a boulder on the space which the player is trying to move onto and return 1 if there is and 0 if there isn't
+	for (int i = 0; i < fencenum; i++)
+	{
+		if (xco >= (fencepoi + i)->posx && xco <= ((fencepoi + i)->posx + 31) && yco >= (fencepoi + i)->posy && yco <= ((fencepoi + i)->posy + 31)) return 1;
+		//The above if statement checks if the provided x and y coordinates are in the same square as the boulder
+	}
+	return 0; //If we exit the loop, then there is no boulder in the player's path and they can move.
+}
+
+
+void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen, Car *carpoi, int carnum, Log *logpoi, int lognum, Game * gamepoi, Boulder *boulpoi, Fence *fencepoi) 
 {
 	int x = play->posx;
 	int y = play->posy;
 	int i;
 	if ((bitfield & U_DIR) == 0)
 	{
-		gamepoi->step--;
-		if ((y - 32) >= heightstart) //If (y - 32) < 40, then moving up would move the player out of bounds (which would be bad)
+		if ((y - 32) >= heightstart && checkrock(play, boulpoi, 1, x, (y - 32)) == 0 && checkfence(play, fencepoi, 1, x, (y - 32)) == 0) //If (y - 32) < 40, then moving up would move the player out of bounds (which would be bad)
 		{
+			gamepoi->step--;
 			for (i = 0; i < 8; i++)
 			{
 				y -= 4;
 				play->posy = y;
-				if (refreshscreen(play, pix, screen, carpoi, carnum, logpoi, lognum, gamepoi) == 1) break;
+				if (refreshscreen(play, pix, screen, carpoi, carnum, logpoi, lognum, gamepoi, boulpoi, fencepoi) == 1) break;
 				Wait(20833);
 			}
 		}
 	}
 	else if ((bitfield & D_DIR) == 0)
 	{
-		if ((y + 32) <= (heightend - 32))
+		if ((y + 32) <= (heightend - 32) && checkrock(play, boulpoi, 1, x, (y + 32)) == 0 && checkfence(play, fencepoi, 1, x, (y + 32)) == 0)
 		{
+			gamepoi->step--;
 			for (i = 0; i < 8; i++)
 			{
 				y += 4;
 				play->posy = y;
-				if (refreshscreen(play, pix, screen, carpoi, carnum, logpoi, lognum, gamepoi) == 1) break;
+				if (refreshscreen(play, pix, screen, carpoi, carnum, logpoi, lognum, gamepoi, boulpoi, fencepoi) == 1) break;
 				Wait(20833);
 			}
 		}
 	}
 	else if ((bitfield & L_DIR) == 0)
 	{
-		if ((x - 32) >= widthStart)
+		if ((x - 32) >= widthStart && checkrock(play, boulpoi, 1, (x - 32), y) == 0 && checkfence(play, fencepoi, 1, (x - 32), y) == 0)
 		{
+			gamepoi->step--;
 			for (i = 0; i < 8; i++)
 			{
 				x -= 4;
 				play->posx = x;
-				if (refreshscreen(play, pix, screen, carpoi, carnum, logpoi, lognum, gamepoi) == 1) break;
+				if (refreshscreen(play, pix, screen, carpoi, carnum, logpoi, lognum, gamepoi, boulpoi, fencepoi) == 1) break;
 				Wait(20833);
 			}	
 		}
 	}
 	else if ((bitfield & R_DIR) == 0)
 	{
-		if ((x + 32) <= (widthEnd - 32))
+		if ((x + 32) <= (widthEnd - 32) && checkrock(play, boulpoi, 1, (x + 32), y) == 0 && checkfence(play, fencepoi, 1, (x + 32), y) == 0)
 		{
+			gamepoi->step--;
 			for (i = 0; i < 8; i++)
 			{
 				x += 4;
 				play->posx = x;
-				if (refreshscreen(play, pix, screen, carpoi, carnum, logpoi, lognum, gamepoi) == 1) break;
+				if (refreshscreen(play, pix, screen, carpoi, carnum, logpoi, lognum, gamepoi, boulpoi, fencepoi) == 1) break;
 				Wait(20833);
 			}	
 		}
@@ -614,11 +701,23 @@ int main(int argc, char **argv)
 	Pixel *screen;	
 	screen = (Pixel *)malloc((1280 * 720) * sizeof(Pixel)); //This will create an array of pixels
 	Car *npo;
-	npo = (Car *)malloc(8 * sizeof(Car));
+	npo = (Car *)malloc(16 * sizeof(Car));
 	Log *logarr; 
 	logarr = (Log *)malloc(16 * sizeof(Log));
 	Game *gamepoi;
 	gamepoi = (Game *)malloc(sizeof(Game));
+	
+	Boulder *rock;
+	rock = (Boulder *)malloc(16 * sizeof(Boulder));
+	
+	rock->posy = 616;
+	rock->posx = 640;
+	
+	Fence *chainlink;
+	chainlink = (Fence *)malloc(16 * sizeof(Fence));
+	chainlink->posy = 616;
+	chainlink->posx = 704;
+	
 	int pos = 0;
 	int i;
 	for (i = 0; i < 4; i++)
@@ -682,18 +781,18 @@ int main(int argc, char **argv)
 	
 	initgame(gamepoi);
 	blackscreen(screen, pix);
-	refreshscreen(play, pix, screen, npo, 8, logarr, 16, gamepoi);
+	refreshscreen(play, pix, screen, npo, 8, logarr, 16, gamepoi, rock, chainlink);
 	
 	int looptrue = 1;
 	while (looptrue)
 	{
 		button = Read_SNES(gpio);
-		moveplayer(play, pix, button, screen, npo, 8, logarr, 16, gamepoi);
+		moveplayer(play, pix, button, screen, npo, 8, logarr, 16, gamepoi, rock, chainlink);
 		if (checkwater(play, 72, 168) == 1) 
 		{
 			if (checklog(play, logarr, 16) == 0) gamepoi->life--;
 		} //We don't want to check if the player's on a log until they have completeted a "leap" 
-		refreshscreen(play, pix, screen, npo, 8, logarr, 16, gamepoi);
+		refreshscreen(play, pix, screen, npo, 8, logarr, 16, gamepoi, rock, chainlink);
 		if (checklevel(play) == 1)
 		{
 			gamepoi->score += ((gamepoi->step + gamepoi->time) * 5);
@@ -715,6 +814,8 @@ int main(int argc, char **argv)
 	free(npo);
 	free(logarr);
 	free(gamepoi);
+	free(rock);
+	free(chainlink);
 	
 	return 0;
 }
