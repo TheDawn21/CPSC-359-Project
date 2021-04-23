@@ -34,6 +34,7 @@ typedef struct game
 	int step;
 	short wintrue;
 	short losstrue;
+	short levelinit;
 } Game;
 
 void initgame(Game *gamepoi)
@@ -46,6 +47,7 @@ void initgame(Game *gamepoi)
 	gamepoi->step = 99;
 	gamepoi->wintrue = 0;
 	gamepoi->losstrue = 0;
+	gamepoi->levelinit = 0;
 }
 
 typedef struct {
@@ -103,10 +105,13 @@ void drawfence(Pixel *pix, Pixel *screen, Fence *object)
 		{
 			pix->color = colorpoint[indexa];
 			indexa++;
-			pix->x = x;
-			pix->y = y;
-			indexb = (y * 1280) + x;
-			screen[indexb] = *pix;
+			if (x >= widthStart && x <= widthEnd && y >= heightstart && y <= heightend)
+			{
+				pix->x = x;
+				pix->y = y;
+				indexb = (y * 1280) + x;
+				screen[indexb] = *pix;
+			}
 		}
 	}
 }
@@ -125,10 +130,13 @@ void drawrock(Pixel *pix, Pixel *screen, Boulder *object)
 		{
 			pix->color = colorpoint[indexa];
 			indexa++;
-			pix->x = x;
-			pix->y = y;
-			indexb = (y * 1280) + x;
-			screen[indexb] = *pix;
+			if (x >= widthStart && x <= widthEnd && y >= heightstart && y <= heightend)
+			{
+				pix->x = x;
+				pix->y = y;
+				indexb = (y * 1280) + x;
+				screen[indexb] = *pix;
+			}
 		}
 	}
 }
@@ -158,7 +166,31 @@ void drawBack(Pixel *pix, Pixel *screen)
 			screen[index] = *pix;
 		}
 	}
-	for (int y = 200; y < 680; y++)
+	for (int y = 200; y < 232; y++)
+	{
+		for (int x = widthStart; x < widthEnd; x++)
+		{
+			pix->color = grass;
+			pix->x = x;
+			pix->y = y;
+			index = (y * 1280) + x;
+			screen[index] = *pix;
+		}
+	}
+	
+	for (int y = 232; y < 360; y++)
+	{
+		for (int x = widthStart; x < widthEnd; x++)
+		{
+			pix->color = pavement;
+			pix->x = x;
+			pix->y = y;
+			index = (y * 1280) + x;
+			screen[index] = *pix;
+		}
+	}
+	
+	for (int y = 360; y < heightend; y++)
 	{
 		for (int x = widthStart; x < widthEnd; x++)
 		{
@@ -518,11 +550,11 @@ void drawtime(int curtime, Pixel *pix, Pixel *screen, int xco, int yco)
 	}
 }
 
-int refreshscreen(Player *play, Pixel *pix, Pixel *screen, Car *carpoi, int carnum, Log *logpoi, int lognum, Game * gamepoi, Boulder *boulpoi, Fence *fencepoi)
+int refreshscreen(Player *play, Pixel *pix, Pixel *screen, Car *carpoi, int carnum, Log *logpoi, int lognum, Game * gamepoi, Boulder *boulpoi, int boulnum, Fence *fencepoi, int fencenum)
 {
 	drawBack(pix, screen);
-	drawrock(pix, screen, boulpoi);
-	drawfence(pix, screen, fencepoi);
+	for (int i = 0; i < boulnum; i++) drawrock(pix, screen, (boulpoi + i));
+	for (int i = 0; i < fencenum; i++) drawfence(pix, screen, (fencepoi + i));
 	for (int i = 0; i < lognum; i++) movelog(pix, screen, (logpoi + i));
 	drawscore(gamepoi->score, pix, screen, 0, 0);
 	drawlives(gamepoi->life, pix, screen, 320, 0);
@@ -624,67 +656,565 @@ int checkfence(Player *play, Fence *fencepoi, int fencenum, int xco, int yco)
 }
 
 
-void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen, Car *carpoi, int carnum, Log *logpoi, int lognum, Game * gamepoi, Boulder *boulpoi, Fence *fencepoi) 
+void moveplayer(Player *play, Pixel *pix, unsigned short bitfield, Pixel *screen, Car *carpoi, int carnum, Log *logpoi, int lognum, Game * gamepoi, Boulder *boulpoi, int boulnum, Fence *fencepoi, int fencenum) 
 {
 	int x = play->posx;
 	int y = play->posy;
 	int i;
 	if ((bitfield & U_DIR) == 0)
 	{
-		if ((y - 32) >= heightstart && checkrock(play, boulpoi, 1, x, (y - 32)) == 0 && checkfence(play, fencepoi, 1, x, (y - 32)) == 0) //If (y - 32) < 40, then moving up would move the player out of bounds (which would be bad)
+		if ((y - 32) >= heightstart && checkrock(play, boulpoi, boulnum, x, (y - 32)) == 0 && checkfence(play, fencepoi, fencenum, x, (y - 32)) == 0) //If (y - 32) < 40, then moving up would move the player out of bounds (which would be bad)
 		{
 			gamepoi->step--;
 			for (i = 0; i < 8; i++)
 			{
 				y -= 4;
 				play->posy = y;
-				if (refreshscreen(play, pix, screen, carpoi, carnum, logpoi, lognum, gamepoi, boulpoi, fencepoi) == 1) break;
+				if (refreshscreen(play, pix, screen, carpoi, carnum, logpoi, lognum, gamepoi, boulpoi, boulnum, fencepoi, fencenum) == 1) break;
 				Wait(20833);
 			}
 		}
 	}
 	else if ((bitfield & D_DIR) == 0)
 	{
-		if ((y + 32) <= (heightend - 32) && checkrock(play, boulpoi, 1, x, (y + 32)) == 0 && checkfence(play, fencepoi, 1, x, (y + 32)) == 0)
+		if ((y + 32) <= (heightend - 32) && checkrock(play, boulpoi, boulnum, x, (y + 32)) == 0 && checkfence(play, fencepoi, fencenum, x, (y + 32)) == 0)
 		{
 			gamepoi->step--;
 			for (i = 0; i < 8; i++)
 			{
 				y += 4;
 				play->posy = y;
-				if (refreshscreen(play, pix, screen, carpoi, carnum, logpoi, lognum, gamepoi, boulpoi, fencepoi) == 1) break;
+				if (refreshscreen(play, pix, screen, carpoi, carnum, logpoi, lognum, gamepoi, boulpoi, boulnum, fencepoi, fencenum) == 1) break;
 				Wait(20833);
 			}
 		}
 	}
 	else if ((bitfield & L_DIR) == 0)
 	{
-		if ((x - 32) >= widthStart && checkrock(play, boulpoi, 1, (x - 32), y) == 0 && checkfence(play, fencepoi, 1, (x - 32), y) == 0)
+		if ((x - 32) >= widthStart && checkrock(play, boulpoi, boulnum, (x - 32), y) == 0 && checkfence(play, fencepoi, fencenum, (x - 32), y) == 0)
 		{
 			gamepoi->step--;
 			for (i = 0; i < 8; i++)
 			{
 				x -= 4;
 				play->posx = x;
-				if (refreshscreen(play, pix, screen, carpoi, carnum, logpoi, lognum, gamepoi, boulpoi, fencepoi) == 1) break;
+				if (refreshscreen(play, pix, screen, carpoi, carnum, logpoi, lognum, gamepoi, boulpoi, boulnum, fencepoi, fencenum) == 1) break;
 				Wait(20833);
 			}	
 		}
 	}
 	else if ((bitfield & R_DIR) == 0)
 	{
-		if ((x + 32) <= (widthEnd - 32) && checkrock(play, boulpoi, 1, (x + 32), y) == 0 && checkfence(play, fencepoi, 1, (x + 32), y) == 0)
+		if ((x + 32) <= (widthEnd - 32) && checkrock(play, boulpoi, boulnum, (x + 32), y) == 0 && checkfence(play, fencepoi, fencenum, (x + 32), y) == 0)
 		{
 			gamepoi->step--;
 			for (i = 0; i < 8; i++)
 			{
 				x += 4;
 				play->posx = x;
-				if (refreshscreen(play, pix, screen, carpoi, carnum, logpoi, lognum, gamepoi, boulpoi, fencepoi) == 1) break;
+				if (refreshscreen(play, pix, screen, carpoi, carnum, logpoi, lognum, gamepoi, boulpoi, boulnum, fencepoi, fencenum) == 1) break;
 				Wait(20833);
 			}	
 		}
 	}
+}
+void initlevel1(Car * carpoi, int carnum, Log *logpoi, int lognum, Boulder *boulpoi, int boulnum, Fence *fencepoi, int fencenum)
+{
+	int pos = widthStart;
+	int i;
+	for (i = 0; i < 2; i++)
+	{
+		(carpoi + i)->posx = pos;
+		pos += 128;
+		(carpoi + i)->posy = 264;
+		(carpoi + i)->speed = 2;
+		(carpoi + i)->width = 48;
+	}
+	pos = widthEnd;
+	for (i = 2; i < 4; i++)
+	{
+		(carpoi + i)->posx = pos;
+		pos -= 128;
+		(carpoi + i)->posy = 328;
+		(carpoi + i)->speed = -2;
+		(carpoi + i)->width = 48;
+	}
+	for (i = 4; i < carnum; i++)
+	{
+		(carpoi + i)->posx = 0;
+		(carpoi + i)->posy = 0;
+		(carpoi + i)->speed = 0;
+		(carpoi + i)->width = 0;
+	}
+	//The cars are placed, let's move on to the logs.
+	pos = widthStart;
+	for (i = 0; i < 4; i++)
+	{
+		(logpoi + i)->width = 64;
+		(logpoi + i)->posy = 72;
+		(logpoi + i)->posx = pos;
+		pos += 128;
+		(logpoi + i)->speed = 2;
+	}
+	pos = widthEnd;
+	for (i = 4; i < 8; i++)
+	{
+		(logpoi + i)->width = 64;
+		(logpoi + i)->posy = 104;
+		(logpoi + i)->posx = pos;
+		pos -= 128;
+		(logpoi + i)->speed = -2;
+	}
+	pos = widthStart;
+	for (i = 8; i < 12; i++)
+	{
+		(logpoi + i)->width = 64;
+		(logpoi + i)->posy = 136;
+		(logpoi + i)->posx = pos;
+		pos += 128;
+		(logpoi + i)->speed = 2;
+	}
+	pos = widthEnd;
+	for (i = 12; i < 16; i++)
+	{
+		(logpoi + i)->width = 64;
+		(logpoi + i)->posy = 168;
+		(logpoi + i)->posx = pos;
+		pos -= 128;
+		(logpoi + i)->speed = -2;
+	}
+	
+	pos = widthStart;
+	for (i = 0; i < 3; i++)
+	{
+		(fencepoi + i)->posx = pos;
+		pos += 32;
+		(fencepoi + i)->posy = 392;
+	}
+	pos = widthEnd - 32;
+	for (i = 3; i < 6; i++)
+	{
+		(fencepoi + i)->posx = pos;
+		pos -= 32;
+		(fencepoi + i)->posy = 392;
+	}
+	for (i = 6; i < fencenum; i++)
+	{
+		(fencepoi + i)->posx = 0;
+		(fencepoi + i)->posy = 0;
+	}
+	boulpoi->posy = 424;
+	boulpoi->posx = widthStart;
+	
+	(boulpoi + 1)->posy = 424;
+	(boulpoi + 1)->posx = widthEnd - 32;
+	
+	for (i = 2; i < boulnum; i++)
+	{
+		(boulpoi + i)->posy = 0;
+		(boulpoi + i)->posx = 0;
+	}
+}
+
+void initlevel2(Car * carpoi, int carnum, Log *logpoi, int lognum, Boulder *boulpoi, int boulnum, Fence *fencepoi, int fencenum)
+{
+	int pos = widthStart;
+	int i;
+	for (i = 0; i < 2; i++)
+	{
+		(carpoi + i)->posx = pos;
+		pos += 128;
+		(carpoi + i)->posy = 232;
+		(carpoi + i)->speed = 2;
+		(carpoi + i)->width = 48;
+	}
+	pos = widthEnd;
+	for (i = 2; i < 4; i++)
+	{
+		(carpoi + i)->posx = pos;
+		pos -= 128;
+		(carpoi + i)->posy = 264;
+		(carpoi + i)->speed = -2;
+		(carpoi + i)->width = 48;
+	}
+	pos = widthStart;
+	for (i = 4; i < 6; i++)
+	{
+		(carpoi + i)->posx = pos;
+		pos += 128;
+		(carpoi + i)->posy = 296;
+		(carpoi + i)->speed = 2;
+		(carpoi + i)->width = 48;
+	}
+	pos = widthEnd;
+	for (i = 6; i < 8; i++)
+	{
+		(carpoi + i)->posx = pos;
+		pos -= 128;
+		(carpoi + i)->posy = 328;
+		(carpoi + i)->speed = -2;
+		(carpoi + i)->width = 48;
+	}
+	for (i = 8; i < carnum; i++)
+	{
+		(carpoi + i)->posx = 0;
+		(carpoi + i)->posy = 0;
+		(carpoi + i)->speed = 0;
+		(carpoi + i)->width = 0;
+	}
+	//The cars are placed, let's move on to the logs.
+	pos = widthStart;
+	for (i = 0; i < 3; i++)
+	{
+		(logpoi + i)->width = 64;
+		(logpoi + i)->posy = 72;
+		(logpoi + i)->posx = pos;
+		pos += 128;
+		(logpoi + i)->speed = 2;
+	}
+	pos = widthEnd;
+	for (i = 3; i < 6; i++)
+	{
+		(logpoi + i)->width = 64;
+		(logpoi + i)->posy = 104;
+		(logpoi + i)->posx = pos;
+		pos -= 128;
+		(logpoi + i)->speed = -2;
+	}
+	pos = widthStart;
+	for (i = 6; i < 9; i++)
+	{
+		(logpoi + i)->width = 64;
+		(logpoi + i)->posy = 136;
+		(logpoi + i)->posx = pos;
+		pos += 128;
+		(logpoi + i)->speed = 2;
+	}
+	pos = widthEnd;
+	for (i = 9; i < 12; i++)
+	{
+		(logpoi + i)->width = 64;
+		(logpoi + i)->posy = 168;
+		(logpoi + i)->posx = pos;
+		pos -= 128;
+		(logpoi + i)->speed = -2;
+	}
+	
+	for (i = 12; i < lognum; i++)
+	{
+		(logpoi + i)->width = 0;
+		(logpoi + i)->posy = 0;
+		(logpoi + i)->posx = 0;
+		(logpoi + i)->speed = 0;
+	}
+	
+	pos = widthStart;
+	for (i = 0; i < 5; i++)
+	{
+		(fencepoi + i)->posx = pos;
+		pos += 32;
+		(fencepoi + i)->posy = 392;
+	}
+	pos = widthEnd - 32;
+	for (i = 5; i < 10; i++)
+	{
+		(fencepoi + i)->posx = pos;
+		pos -= 32;
+		(fencepoi + i)->posy = 392;
+	}
+	for (i = 10; i < fencenum; i++)
+	{
+		(fencepoi + i)->posx = 0;
+		(fencepoi + i)->posy = 0;
+	}
+	boulpoi->posy = 424;
+	boulpoi->posx = widthStart;
+	
+	(boulpoi + 1)->posy = 424;
+	(boulpoi + 1)->posx = widthEnd - 32;
+	
+	(boulpoi + 2)->posy = 424 + 64;
+	(boulpoi + 2)->posx = widthStart + 128;
+	
+	(boulpoi + 3)->posy = 424 + 32;
+	(boulpoi + 3)->posy = widthEnd - 160;
+	
+	for (i = 4; i < boulnum; i++)
+	{
+		(boulpoi + i)->posy = 0;
+		(boulpoi + i)->posx = 0;
+	}
+}
+
+void initlevel3(Car * carpoi, int carnum, Log *logpoi, int lognum, Boulder *boulpoi, int boulnum, Fence *fencepoi, int fencenum)
+{
+	int pos = widthStart;
+	int i;
+	for (i = 0; i < 3; i++)
+	{
+		(carpoi + i)->posx = pos;
+		pos += 128;
+		(carpoi + i)->posy = 232;
+		(carpoi + i)->speed = 4;
+		(carpoi + i)->width = 48;
+	}
+	pos = widthEnd;
+	for (i = 3; i < 6; i++)
+	{
+		(carpoi + i)->posx = pos;
+		pos -= 128;
+		(carpoi + i)->posy = 264;
+		(carpoi + i)->speed = -4;
+		(carpoi + i)->width = 48;
+	}
+	pos = widthStart;
+	for (i = 6; i < 9; i++)
+	{
+		(carpoi + i)->posx = pos;
+		pos += 128;
+		(carpoi + i)->posy = 296;
+		(carpoi + i)->speed = 4;
+		(carpoi + i)->width = 48;
+	}
+	pos = widthEnd;
+	for (i = 9; i < 12; i++)
+	{
+		(carpoi + i)->posx = pos;
+		pos -= 128;
+		(carpoi + i)->posy = 328;
+		(carpoi + i)->speed = -4;
+		(carpoi + i)->width = 48;
+	}
+	for (i = 12; i < carnum; i++)
+	{
+		(carpoi + i)->posx = 0;
+		(carpoi + i)->posy = 0;
+		(carpoi + i)->speed = 0;
+		(carpoi + i)->width = 0;
+	}
+	//The cars are placed, let's move on to the logs.
+	pos = widthStart;
+	for (i = 0; i < 3; i++)
+	{
+		(logpoi + i)->width = 48;
+		(logpoi + i)->posy = 72;
+		(logpoi + i)->posx = pos;
+		pos += 128;
+		(logpoi + i)->speed = 4;
+	}
+	pos = widthEnd;
+	for (i = 3; i < 6; i++)
+	{
+		(logpoi + i)->width = 48;
+		(logpoi + i)->posy = 104;
+		(logpoi + i)->posx = pos;
+		pos -= 128;
+		(logpoi + i)->speed = -4;
+	}
+	pos = widthStart;
+	for (i = 6; i < 9; i++)
+	{
+		(logpoi + i)->width = 48;
+		(logpoi + i)->posy = 136;
+		(logpoi + i)->posx = pos;
+		pos += 128;
+		(logpoi + i)->speed = 4;
+	}
+	pos = widthEnd;
+	for (i = 9; i < 12; i++)
+	{
+		(logpoi + i)->width = 48;
+		(logpoi + i)->posy = 168;
+		(logpoi + i)->posx = pos;
+		pos -= 128;
+		(logpoi + i)->speed = -4;
+	}
+	
+	for (i = 12; i < lognum; i++)
+	{
+		(logpoi + i)->width = 0;
+		(logpoi + i)->posy = 0;
+		(logpoi + i)->posx = 0;
+		(logpoi + i)->speed = 0;
+	}
+	
+	pos = widthStart;
+	for (i = 0; i < 6; i++)
+	{
+		(fencepoi + i)->posx = pos;
+		pos += 32;
+		(fencepoi + i)->posy = 360;
+	}
+	pos = widthEnd - 32;
+	for (i = 6; i < 12; i++)
+	{
+		(fencepoi + i)->posx = pos;
+		pos -= 32;
+		(fencepoi + i)->posy = 360;
+	}
+	for (i = 12; i < fencenum; i++)
+	{
+		(fencepoi + i)->posx = 0;
+		(fencepoi + i)->posy = 0;
+	}
+	pos = widthStart + 64;
+	for (i = 0; i < 4; i++)
+	{
+		(boulpoi + i)->posx = pos;
+		pos += 32;
+		(boulpoi + i)->posy = 360 + 64;
+	}
+	pos = widthEnd - 96;
+	for (i = 4; i < 8; i++)
+	{
+		(boulpoi + i)->posx = pos;
+		pos -= 32;
+		(boulpoi + i)->posy = 360 + 128;
+	}
+	for (i = 8; i < boulnum; i++)
+	{
+		(boulpoi + i)->posx = 0;
+		(boulpoi + i)->posy = 0;
+	}
+}
+
+void initlevel4(Car * carpoi, int carnum, Log *logpoi, int lognum, Boulder *boulpoi, int boulnum, Fence *fencepoi, int fencenum)
+{
+	int pos = widthStart;
+	int i;
+	for (i = 0; i < 4; i++)
+	{
+		(carpoi + i)->posx = pos;
+		pos += 96;
+		(carpoi + i)->posy = 232;
+		(carpoi + i)->speed = 4;
+		(carpoi + i)->width = 48;
+	}
+	pos = widthEnd;
+	for (i = 4; i < 8; i++)
+	{
+		(carpoi + i)->posx = pos;
+		pos -= 96;
+		(carpoi + i)->posy = 264;
+		(carpoi + i)->speed = -4;
+		(carpoi + i)->width = 48;
+	}
+	pos = widthStart;
+	for (i = 8; i < 12; i++)
+	{
+		(carpoi + i)->posx = pos;
+		pos += 96;
+		(carpoi + i)->posy = 296;
+		(carpoi + i)->speed = 4;
+		(carpoi + i)->width = 48;
+	}
+	pos = widthEnd;
+	for (i = 12; i < carnum; i++)
+	{
+		(carpoi + i)->posx = pos;
+		pos -= 96;
+		(carpoi + i)->posy = 328;
+		(carpoi + i)->speed = -4;
+		(carpoi + i)->width = 48;
+	}
+	
+	//The cars are placed, let's move on to the logs.
+	pos = widthStart;
+	for (i = 0; i < 2; i++)
+	{
+		(logpoi + i)->width = 48;
+		(logpoi + i)->posy = 72;
+		(logpoi + i)->posx = pos;
+		pos += 160;
+		(logpoi + i)->speed = 4;
+	}
+	pos = widthEnd;
+	for (i = 2; i < 4; i++)
+	{
+		(logpoi + i)->width = 48;
+		(logpoi + i)->posy = 104;
+		(logpoi + i)->posx = pos;
+		pos -= 160;
+		(logpoi + i)->speed = -4;
+	}
+	pos = widthStart;
+	for (i = 4; i < 6; i++)
+	{
+		(logpoi + i)->width = 48;
+		(logpoi + i)->posy = 136;
+		(logpoi + i)->posx = pos;
+		pos += 160;
+		(logpoi + i)->speed = 4;
+	}
+	pos = widthEnd;
+	for (i = 6; i < 8; i++)
+	{
+		(logpoi + i)->width = 48;
+		(logpoi + i)->posy = 168;
+		(logpoi + i)->posx = pos;
+		pos -= 160;
+		(logpoi + i)->speed = -4;
+	}
+	
+	for (i = 8; i < lognum; i++)
+	{
+		(logpoi + i)->width = 0;
+		(logpoi + i)->posy = 0;
+		(logpoi + i)->posx = 0;
+		(logpoi + i)->speed = 0;
+	}
+	
+	pos = widthStart + 32;
+	for (i = 0; i < 8; i++)
+	{
+		(fencepoi + i)->posx = pos;
+		pos += 32;
+		(fencepoi + i)->posy = 360;
+	}
+	pos += 32;
+	for (i = 8; i < fencenum; i++)
+	{
+		(fencepoi + i)->posx = pos;
+		pos += 32;
+		(fencepoi + i)->posy = 360;
+	}
+	
+	pos = widthStart + 64;
+	for (i = 0; i < 4; i++)
+	{
+		(boulpoi + i)->posx = pos;
+		pos += 32;
+		(boulpoi + i)->posy = 360 + 64;
+	}
+	pos = widthEnd - 96;
+	for (i = 4; i < 8; i++)
+	{
+		(boulpoi + i)->posx = pos;
+		pos -= 32;
+		(boulpoi + i)->posy = 360 + 128;
+	}
+	pos = widthStart + 64;
+	for (i = 8; i < 12; i++)
+	{
+		(boulpoi + i)->posx = pos;
+		pos += 32;
+		(boulpoi + i)->posy = 360 + 192;
+	}
+	pos = widthEnd - 96;
+	for (i = 12; i < boulnum; i++)
+	{
+		(boulpoi + i)->posx = pos;
+		pos -= 32;
+		(boulpoi + i)->posy = 616;
+	}
+}
+
+void initlevel(int level, Car * carpoi, int carnum, Log *logpoi, int lognum, Boulder *boulpoi, int boulnum, Fence *fencepoi, int fencenum)
+{
+	if (level == 1) { initlevel1(carpoi, carnum, logpoi, lognum, boulpoi, boulnum, fencepoi, fencenum); }
+	else if (level == 2) { initlevel2(carpoi, carnum, logpoi, lognum, boulpoi, boulnum, fencepoi, fencenum); }
+	else if (level == 3) { initlevel3(carpoi, carnum, logpoi, lognum, boulpoi, boulnum, fencepoi, fencenum); }
+	else if (level == 4) { initlevel4(carpoi, carnum, logpoi, lognum, boulpoi, boulnum, fencepoi, fencenum); }
 }
 
 int main(int argc, char **argv)
@@ -710,69 +1240,9 @@ int main(int argc, char **argv)
 	Boulder *rock;
 	rock = (Boulder *)malloc(16 * sizeof(Boulder));
 	
-	rock->posy = 616;
-	rock->posx = 640;
-	
 	Fence *chainlink;
 	chainlink = (Fence *)malloc(16 * sizeof(Fence));
-	chainlink->posy = 616;
-	chainlink->posx = 704;
 	
-	int pos = 0;
-	int i;
-	for (i = 0; i < 4; i++)
-	{
-		npo[i].width = 48;		//128
-		npo[i].posy = 232;		// 64
-		npo[i].posx = pos;		//192
-		pos += 256;
-		npo[i].speed = 4;
-	}
-	pos = 1000;
-	for (i = 4; i < 8; i++)
-	{
-		npo[i].width = 48;
-		npo[i].posy = 264;
-		npo[i].posx = pos;
-		pos -= 256;
-		npo[i].speed = -4;
-	}
-	pos = 0;
-	for (i = 0; i < 4; i++)
-	{
-		logarr[i].width = 48;
-		logarr[i].posy = 72;
-		logarr[i].posx = pos;
-		pos += 256;
-		logarr[i].speed = 4;
-	}
-	pos = 1000;
-	for (i = 4; i < 8; i++)
-	{
-		logarr[i].width = 48;
-		logarr[i].posy = 104;
-		logarr[i].posx = pos;
-		pos -= 256;
-		logarr[i].speed = -4;
-	}
-	pos = 0;
-	for (i = 8; i < 12; i++)
-	{
-		logarr[i].width = 48;
-		logarr[i].posy = 136;
-		logarr[i].posx = pos;
-		pos += 256;
-		logarr[i].speed = 4;
-	}
-	pos = 1000;
-	for (i = 12; i < 16; i++)
-	{
-		logarr[i].width = 48;
-		logarr[i].posy = 168;
-		logarr[i].posx = pos;
-		pos -= 256;
-		logarr[i].speed = -4;
-	}
 	
 	play->posy = 648;
 	play->posx = 640;
@@ -781,24 +1251,30 @@ int main(int argc, char **argv)
 	
 	initgame(gamepoi);
 	blackscreen(screen, pix);
-	refreshscreen(play, pix, screen, npo, 8, logarr, 16, gamepoi, rock, chainlink);
+	refreshscreen(play, pix, screen, npo, 16, logarr, 16, gamepoi, rock, 16, chainlink, 16);
 	
 	int looptrue = 1;
 	while (looptrue)
 	{
+		if (gamepoi->levelinit == 0)
+		{
+			initlevel(gamepoi->level, npo, 16, logarr, 16, rock, 16, chainlink, 16);
+			gamepoi->levelinit = 1;
+		}
 		button = Read_SNES(gpio);
-		moveplayer(play, pix, button, screen, npo, 8, logarr, 16, gamepoi, rock, chainlink);
+		moveplayer(play, pix, button, screen, npo, 16, logarr, 16, gamepoi, rock, 16, chainlink, 16);
 		if (checkwater(play, 72, 168) == 1) 
 		{
 			if (checklog(play, logarr, 16) == 0) gamepoi->life--;
 		} //We don't want to check if the player's on a log until they have completeted a "leap" 
-		refreshscreen(play, pix, screen, npo, 8, logarr, 16, gamepoi, rock, chainlink);
+		refreshscreen(play, pix, screen, npo, 16, logarr, 16, gamepoi, rock, 16, chainlink, 16);
 		if (checklevel(play) == 1)
 		{
 			gamepoi->score += ((gamepoi->step + gamepoi->time) * 5);
 			gamepoi->step = 99;
 			gamepoi->time = 90;
 			gamepoi->level++;
+			gamepoi->levelinit = 0;
 			play->posy = 648;
 			play->posx = 640;
 		}
